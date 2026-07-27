@@ -1,0 +1,122 @@
+/**
+ * DashboardPage — the interactive floor map + sidebar + filters + popover.
+ */
+import { useCallback, useMemo, useState } from 'react';
+import DeskPopover from '@/components/DeskPopover';
+import FilterBar, { type DeskFilters } from '@/components/FilterBar';
+import LayoutDashboard from '@/components/LayoutDashboard';
+import Sidebar from '@/components/Sidebar';
+import StatusLegend from '@/components/StatusLegend';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { deskUiStatus } from '@/types/desk';
+
+const NO_FILTERS: DeskFilters = { onlyVacant: false, onlyTradein: false };
+
+export default function DashboardPage() {
+  const { desks, summary, loading, error, lastUpdated, isMock, refresh } = useDashboardData();
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<DeskFilters>(NO_FILTERS);
+
+  const handleSelect = useCallback((id: string) => {
+    setSelectedId((prev) => (prev === id ? null : id));
+  }, []);
+
+  const dimmedIds = useMemo(() => {
+    if (!filters.onlyVacant && !filters.onlyTradein) return undefined;
+    const set = new Set<string>();
+    for (const d of desks) {
+      const matches =
+        (!filters.onlyVacant || deskUiStatus(d) === 'available') &&
+        (!filters.onlyTradein || d.cluster === 'tradein');
+      if (!matches) set.add(d.id);
+    }
+    return set;
+  }, [desks, filters]);
+
+  const selectedDesk = useMemo(() => {
+    if (!selectedId || dimmedIds?.has(selectedId)) return null;
+    return desks.find((d) => d.id === selectedId) ?? null;
+  }, [desks, selectedId, dimmedIds]);
+
+  return (
+    <div className="min-h-full bg-neutral-100 text-neutral-800">
+      <header className="border-b border-neutral-200 bg-white px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold">NPI Event · Coordinator Dashboard</h1>
+            <p className="text-sm text-neutral-500">
+              Sơ đồ tương tác điều phối luồng khách — đồng bộ trạng thái bàn từ Lark Base.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs">
+            <a
+              href="#/settings"
+              className="rounded border border-brand px-2 py-1 font-semibold text-brand hover:bg-brand hover:text-white"
+            >
+              Cài đặt Lark
+            </a>
+            <span
+              className={[
+                'rounded-full px-2 py-1 font-semibold',
+                isMock ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700',
+              ].join(' ')}
+            >
+              {isMock ? 'Mock data' : 'Lark Base (live · 30s)'}
+            </span>
+            {error ? (
+              <span className="rounded-full bg-red-100 px-2 py-1 font-semibold text-red-700">
+                Lỗi đồng bộ
+              </span>
+            ) : (
+              <span className="text-neutral-500">
+                {loading
+                  ? 'Đang tải…'
+                  : lastUpdated
+                    ? `Cập nhật: ${lastUpdated.toLocaleTimeString('vi-VN')}`
+                    : '—'}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={refresh}
+              className="rounded border border-neutral-300 px-2 py-1 font-medium text-neutral-600 hover:bg-neutral-50"
+            >
+              Làm mới
+            </button>
+          </div>
+        </div>
+        {error && (
+          <p className="mt-2 truncate text-xs text-red-600" title={error}>
+            {error}
+          </p>
+        )}
+      </header>
+
+      <main className="px-6 py-6">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <StatusLegend />
+          <FilterBar filters={filters} onChange={setFilters} />
+        </div>
+
+        <div className="flex flex-col gap-6 lg:flex-row">
+          <div className="min-w-0 flex-1">
+            <LayoutDashboard
+              desks={desks}
+              selectedId={selectedId}
+              onSelect={handleSelect}
+              dimmedIds={dimmedIds}
+              overlay={
+                selectedDesk && (
+                  <DeskPopover desk={selectedDesk} onClose={() => setSelectedId(null)} />
+                )
+              }
+            />
+          </div>
+          <Sidebar summary={summary} />
+        </div>
+      </main>
+    </div>
+  );
+}
