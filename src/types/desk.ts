@@ -30,6 +30,8 @@ export type DeskUiStatus = 'idle' | 'available' | 'occupied';
 export interface DeskCustomer {
   stt: string | null; // STT khách (hiển thị trên chấm)
   name: string | null; // tên (hiển thị khi hover / trong popover)
+  productName?: string | null; // SP 1 (join Check in theo tên)
+  paymentNote?: string | null; // Note UDTT (join Check in theo tên)
 }
 
 /** Số khách tối đa 1 nhân viên tiếp nhận đồng thời (theo cụm). */

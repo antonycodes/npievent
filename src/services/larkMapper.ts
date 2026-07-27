@@ -66,8 +66,13 @@ function indexCheckinByName(
   return m;
 }
 
-/** Nhóm khách "Tiếp nhận" theo mã bàn (cắt tối đa theo capacity). */
-function indexReceived(rows: LarkRecord[], fm: TxFieldMap, cap: number): Map<string, DeskCustomer[]> {
+/** Nhóm khách "Tiếp nhận" theo mã bàn (cắt tối đa theo capacity), kèm SP/note. */
+function indexReceived(
+  rows: LarkRecord[],
+  fm: TxFieldMap,
+  cap: number,
+  checkinByName: Map<string, { product: string | null; note: string | null }>,
+): Map<string, DeskCustomer[]> {
   const m = new Map<string, DeskCustomer[]>();
   for (const r of rows) {
     if (cellToString(r.fields[fm.status]) !== STATUS_RECEIVED) continue;
@@ -75,7 +80,14 @@ function indexReceived(rows: LarkRecord[], fm: TxFieldMap, cap: number): Map<str
     if (!code) continue;
     const list = m.get(code) ?? [];
     if (list.length < cap) {
-      list.push({ stt: cellToString(r.fields[fm.stt]), name: cellToString(r.fields[fm.name]) });
+      const name = cellToString(r.fields[fm.name]);
+      const ci = name ? checkinByName.get(name) : undefined;
+      list.push({
+        stt: cellToString(r.fields[fm.stt]),
+        name,
+        productName: ci?.product ?? null,
+        paymentNote: ci?.note ?? null,
+      });
       m.set(code, list);
     }
   }
@@ -86,7 +98,7 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
   const { ds, dsStatus, checkin, txConsult } = fields;
   const checkinByName = indexCheckinByName(tables.checkin, checkin);
   // Danh sách khách tiếp nhận theo bàn Tư vấn (Phương án A).
-  const receivedByDesk = indexReceived(tables.txConsult ?? [], txConsult, DESK_CAPACITY.consult);
+  const receivedByDesk = indexReceived(tables.txConsult ?? [], txConsult, DESK_CAPACITY.consult, checkinByName);
   const statesById: Record<string, DeskLiveState> = {};
 
   for (const cluster of CLUSTERS) {
@@ -116,7 +128,9 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
       // Danh sách khách tiếp nhận: cụm Tư vấn lấy từ txConsult; cụm khác (hoặc
       // khi thiếu txConsult) fallback về "khách gần nhất" nếu đang phục vụ.
       const fallback: DeskCustomer[] =
-        occupied && (customerName || customerSTT) ? [{ stt: customerSTT, name: customerName }] : [];
+        occupied && (customerName || customerSTT)
+          ? [{ stt: customerSTT, name: customerName, productName, paymentNote }]
+          : [];
       const receivedCustomers: DeskCustomer[] =
         cluster === 'consult' ? (receivedByDesk.get(code) ?? fallback) : fallback;
 

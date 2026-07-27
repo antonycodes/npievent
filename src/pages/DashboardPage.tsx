@@ -2,6 +2,7 @@
  * DashboardPage — the interactive floor map + sidebar + filters + popover.
  */
 import { useCallback, useMemo, useState } from 'react';
+import CustomerPopover from '@/components/CustomerPopover';
 import DeskPopover from '@/components/DeskPopover';
 import FilterBar, { type DeskFilters } from '@/components/FilterBar';
 import LayoutDashboard from '@/components/LayoutDashboard';
@@ -16,10 +17,19 @@ export default function DashboardPage() {
   const { desks, summary, loading, error, lastUpdated, isMock, refresh } = useDashboardData();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<{ deskId: string; index: number } | null>(null);
   const [filters, setFilters] = useState<DeskFilters>(NO_FILTERS);
 
   const handleSelect = useCallback((id: string) => {
+    setSelectedCustomer(null);
     setSelectedId((prev) => (prev === id ? null : id));
+  }, []);
+
+  const handleSelectCustomer = useCallback((deskId: string, index: number) => {
+    setSelectedId(null);
+    setSelectedCustomer((prev) =>
+      prev?.deskId === deskId && prev?.index === index ? null : { deskId, index },
+    );
   }, []);
 
   const dimmedIds = useMemo(() => {
@@ -38,6 +48,13 @@ export default function DashboardPage() {
     if (!selectedId || dimmedIds?.has(selectedId)) return null;
     return desks.find((d) => d.id === selectedId) ?? null;
   }, [desks, selectedId, dimmedIds]);
+
+  const selectedCustomerData = useMemo(() => {
+    if (!selectedCustomer || dimmedIds?.has(selectedCustomer.deskId)) return null;
+    const desk = desks.find((d) => d.id === selectedCustomer.deskId);
+    const customer = desk?.receivedCustomers?.[selectedCustomer.index];
+    return desk && customer ? { desk, customer } : null;
+  }, [desks, selectedCustomer, dimmedIds]);
 
   return (
     <div className="min-h-full bg-neutral-100 text-neutral-800">
@@ -106,11 +123,19 @@ export default function DashboardPage() {
               desks={desks}
               selectedId={selectedId}
               onSelect={handleSelect}
+              onSelectCustomer={handleSelectCustomer}
+              selectedCustomer={selectedCustomer}
               dimmedIds={dimmedIds}
               overlay={
-                selectedDesk && (
+                selectedDesk ? (
                   <DeskPopover desk={selectedDesk} onClose={() => setSelectedId(null)} />
-                )
+                ) : selectedCustomerData ? (
+                  <CustomerPopover
+                    desk={selectedCustomerData.desk}
+                    customer={selectedCustomerData.customer}
+                    onClose={() => setSelectedCustomer(null)}
+                  />
+                ) : null
               }
             />
           </div>

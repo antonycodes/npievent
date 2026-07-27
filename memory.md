@@ -295,6 +295,18 @@ Implemented `docs/UPDATE_consult-customer-dots.md` (Phương án A) with mock:
 - Mock: TV2 = {10 Phạm Đức Dũng, 15 Trần Văn Bình}, TV4 = {13,18}.
 - Verified via screenshot: TV2/TV4 show 2 dots each; popover lists both.
 
+### Clickable STT dots for all clusters (added 2026-07-24)
+- Dots now render for tradein/consult/backup (not just consult).
+- Each dot is a button → `CustomerPopover` (STT, tên, Vị trí+NV, Tên sản phẩm,
+  Ghi chú thanh toán). `DeskCustomer` gained `productName`/`paymentNote`, joined
+  from Check in by name in `larkMapper` (incl. the non-consult single fallback).
+- Placement: single-customer desks (TC/BK, cap 1) show a corner badge (bottom-
+  right) to avoid overlapping the tightly-spaced row below; consult (cap 2) shows
+  a row of dots below the node.
+- `DashboardPage` owns `selectedCustomer` (mutually exclusive with the desk
+  popover); `LayoutDashboard` gets `onSelectCustomer` + `selectedCustomer`.
+- Verified via screenshots (TC1 → Nguyễn Minh Long, BK1 → Huỳnh Ngọc Linh).
+
 ### Check-in funnel card (added 2026-07-24)
 Sidebar "Khách" card now shows 3 ratios instead of a single number:
 - **Check-in / Tổng đăng ký** = Check-in rows / Orders rows (`Danh sách đơn hàng`)

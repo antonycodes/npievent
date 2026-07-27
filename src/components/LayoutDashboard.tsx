@@ -11,6 +11,10 @@ interface LayoutDashboardProps {
   desks: DeskData[];
   selectedId?: string | null;
   onSelect?: (id: string) => void;
+  /** Bấm 1 chấm STT khách (deskId + vị trí trong receivedCustomers). */
+  onSelectCustomer?: (deskId: string, index: number) => void;
+  /** Chấm khách đang chọn (viền nổi bật). */
+  selectedCustomer?: { deskId: string; index: number } | null;
   /** Ids to fade out (filtered) — dimmed and non-interactive. */
   dimmedIds?: Set<string>;
   /** Optional overlay (e.g. the popover) drawn on top of the board. */
@@ -42,6 +46,8 @@ export default function LayoutDashboard({
   desks,
   selectedId,
   onSelect,
+  onSelectCustomer,
+  selectedCustomer,
   dimmedIds,
   overlay,
 }: LayoutDashboardProps) {
@@ -88,29 +94,51 @@ export default function LayoutDashboard({
         />
       ))}
 
-      {/* ── Chấm STT khách đã tiếp nhận (bàn Tư vấn) ──────────────── */}
-      {desks.map((d) =>
-        d.cluster === 'consult' && (d.receivedCustomers?.length ?? 0) > 0 ? (
+      {/* ── Chấm STT khách đã tiếp nhận (mọi cụm) — bấm để xem khách ── */}
+      {desks.map((d) => {
+        const list = d.receivedCustomers ?? [];
+        if (list.length === 0) return null;
+        const dim = dimmedIds?.has(d.id) ? 'pointer-events-none opacity-15' : '';
+
+        const Dot = (c: (typeof list)[number], i: number) => {
+          const active = selectedCustomer?.deskId === d.id && selectedCustomer?.index === i;
+          return (
+            <button
+              key={i}
+              type="button"
+              title={`${c.stt ? `#${c.stt} · ` : ''}${c.name ?? ''}`}
+              onClick={() => onSelectCustomer?.(d.id, i)}
+              className={[
+                'flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1',
+                'text-[9px] font-bold text-white shadow ring-1 ring-white transition hover:scale-125',
+                active ? 'z-30 ring-2 ring-blue-500 ring-offset-1 scale-125' : '',
+              ].join(' ')}
+            >
+              {c.stt ?? '•'}
+            </button>
+          );
+        };
+
+        // 1 khách → badge ở góc phải-dưới node (tránh đè bàn hàng dưới).
+        // ≥2 khách → hàng chấm ngay dưới node.
+        return list.length === 1 ? (
           <div
             key={`dots-${d.id}`}
-            className={[
-              'absolute z-10 flex -translate-x-1/2 gap-1',
-              dimmedIds?.has(d.id) ? 'opacity-15' : '',
-            ].join(' ')}
+            className={`absolute z-20 ${dim}`}
+            style={{ left: `${d.x}%`, top: `${d.y}%`, transform: 'translate(4px, 6px)' }}
+          >
+            {Dot(list[0], 0)}
+          </div>
+        ) : (
+          <div
+            key={`dots-${d.id}`}
+            className={`absolute z-20 flex -translate-x-1/2 gap-1 ${dim}`}
             style={{ left: `${d.x}%`, top: `calc(${d.y}% + 22px)` }}
           >
-            {d.receivedCustomers!.map((c, i) => (
-              <span
-                key={i}
-                title={`${c.stt ? `#${c.stt} · ` : ''}${c.name ?? ''}`}
-                className="flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-white shadow"
-              >
-                {c.stt ?? '•'}
-              </span>
-            ))}
+            {list.map(Dot)}
           </div>
-        ) : null,
-      )}
+        );
+      })}
 
       {/* ── Overlay (popover) ─────────────────────────────────────── */}
       {overlay}
