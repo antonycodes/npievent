@@ -16,19 +16,32 @@ import {
   type DashboardSummary,
   type DeskData,
   type DeskLiveState,
+  type WaitingCustomer,
 } from '@/types/desk';
 
 interface RawState {
   statesById: Record<string, DeskLiveState>;
   totalCheckIn: number;
   totalRegistered: number;
+  waitingCheckin: WaitingCustomer[];
+  waitingDispatch: WaitingCustomer[];
 }
 
-const EMPTY: RawState = { statesById: {}, totalCheckIn: 0, totalRegistered: 0 };
+const EMPTY: RawState = {
+  statesById: {},
+  totalCheckIn: 0,
+  totalRegistered: 0,
+  waitingCheckin: [],
+  waitingDispatch: [],
+};
 
 export interface UseDashboardDataResult {
   desks: DeskData[];
   summary: DashboardSummary;
+  /** Đã check-in, chưa từng vào bàn nào — chờ điều phối lần đầu. */
+  waitingCheckin: WaitingCustomer[];
+  /** Vừa hoàn tất 1 cụm, chờ điều phối sang cụm tiếp theo. */
+  waitingDispatch: WaitingCustomer[];
   loading: boolean;
   error: string | null;
   lastUpdated: Date | null;
@@ -100,5 +113,15 @@ export function useDashboardData(): UseDashboardDataResult {
     checkedIn: raw.totalCheckIn,
   });
 
-  return { desks, summary, loading, error, lastUpdated, isMock, refresh };
+  return {
+    desks,
+    summary,
+    waitingCheckin: raw.waitingCheckin,
+    waitingDispatch: raw.waitingDispatch,
+    loading,
+    error,
+    lastUpdated,
+    isMock,
+    refresh,
+  };
 }

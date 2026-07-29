@@ -9,7 +9,13 @@
  * than the desk-local STT). Customer detail is only exposed when the desk is
  * occupied — a free/empty desk shows no customer.
  */
-import { STATUS_RECEIVED, type CheckinFieldMap, type FieldConfig, type TxFieldMap } from '@/config/larkConfig';
+import {
+  STATUS_COMPLETED,
+  STATUS_RECEIVED,
+  type CheckinFieldMap,
+  type FieldConfig,
+  type TxFieldMap,
+} from '@/config/larkConfig';
 import { toFieldConfig } from '@/config/larkSettings';
 import {
   DESK_CAPACITY,
@@ -17,6 +23,7 @@ import {
   type ClusterKey,
   type DeskCustomer,
   type DeskLiveState,
+  type WaitingCustomer,
 } from '@/types/desk';
 import type { LarkCellValue, LarkRecord, LarkTables } from './larkTypes';
 
@@ -39,6 +46,15 @@ export function cellToNumber(v: LarkCellValue): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const TRUTHY_TEXT = new Set(['true', '1', 'x', 'có', 'yes', 'đã nghiệm thu', 'checked']);
+
+/** Coerce a Lark checkbox/text cell (boolean, "true", "1", "Có", ...) to boolean. */
+export function cellToBool(v: LarkCellValue): boolean {
+  if (typeof v === 'boolean') return v;
+  const s = cellToString(v);
+  return s ? TRUTHY_TEXT.has(s.trim().toLowerCase()) : false;
+}
+
 const CLUSTERS: ClusterKey[] = ['tradein', 'consult', 'backup'];
 const DS_KEY = { tradein: 'dsTradein', consult: 'dsConsult', backup: 'dsBackup' } as const;
 
@@ -46,20 +62,25 @@ export interface MappedData {
   statesById: Record<string, DeskLiveState>;
   totalCheckIn: number;
   totalRegistered: number;
+  /** Đã check-in (có STT) nhưng chưa từng xuất hiện ở bàn nào — chờ điều phối lần đầu. */
+  waitingCheckin: WaitingCustomer[];
+  /** Vừa hoàn tất 1 cụm, bàn đang rảnh, chưa được điều phối sang cụm tiếp theo. */
+  waitingDispatch: WaitingCustomer[];
 }
 
-/** Index Check-in rows by customer name → { product, note }. */
+/** Index Check-in rows by customer name → { product, note, deviceAccepted }. */
 function indexCheckinByName(
   rows: LarkRecord[],
   fm: CheckinFieldMap,
-): Map<string, { product: string | null; note: string | null }> {
-  const m = new Map<string, { product: string | null; note: string | null }>();
+): Map<string, { product: string | null; note: string | null; deviceAccepted: boolean }> {
+  const m = new Map<string, { product: string | null; note: string | null; deviceAccepted: boolean }>();
   for (const r of rows) {
     const name = cellToString(r.fields[fm.name]);
     if (name) {
       m.set(name, {
         product: cellToString(r.fields[fm.product]),
         note: cellToString(r.fields[fm.note]),
+        deviceAccepted: cellToBool(r.fields[fm.deviceAccepted]),
       });
     }
   }
@@ -71,7 +92,7 @@ function indexReceived(
   rows: LarkRecord[],
   fm: TxFieldMap,
   cap: number,
-  checkinByName: Map<string, { product: string | null; note: string | null }>,
+  checkinByName: Map<string, { product: string | null; note: string | null; deviceAccepted: boolean }>,
 ): Map<string, DeskCustomer[]> {
   const m = new Map<string, DeskCustomer[]>();
   for (const r of rows) {
@@ -87,6 +108,7 @@ function indexReceived(
         name,
         productName: ci?.product ?? null,
         paymentNote: ci?.note ?? null,
+        deviceAccepted: ci?.deviceAccepted ?? null,
       });
       m.set(code, list);
     }
@@ -101,6 +123,13 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
   const receivedByDesk = indexReceived(tables.txConsult ?? [], txConsult, DESK_CAPACITY.consult, checkinByName);
   const statesById: Record<string, DeskLiveState> = {};
 
+  // Đang được phục vụ ở BẤT KỲ bàn nào ngay lúc này (mọi cụm).
+  const activeNames = new Set<string>();
+  // Đã từng xuất hiện ở bất kỳ bàn nào (mọi trạng thái) — dùng để loại khỏi "Chờ check-in".
+  const everSeenNames = new Set<string>();
+  // Ứng viên "chờ điều phối": bàn vừa hoàn tất (Trạng thái gần nhất) và hiện đang rảnh.
+  const completedCandidates: WaitingCustomer[] = [];
+
   for (const cluster of CLUSTERS) {
     const dsFm = ds[cluster];
 
@@ -109,30 +138,54 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
       if (!code) continue;
 
       const currentStatus = cellToString(rec.fields[dsStatus.currentStatus]);
+      const statusRecent = cellToString(rec.fields[dsStatus.statusRecent]);
+      const sttRecent = cellToString(rec.fields[dsStatus.sttRecent]);
+      const customerRecent = cellToString(rec.fields[dsStatus.customerRecent]);
       const partial: Partial<DeskLiveState> = { currentStatus, hasData: true };
       const occupied = deskUiStatus(partial) === 'occupied';
+
+      if (customerRecent) everSeenNames.add(customerRecent);
 
       // Customer only when the desk is actively serving.
       let customerSTT: string | null = null;
       let customerName: string | null = null;
       let productName: string | null = null;
       let paymentNote: string | null = null;
+      let deviceAccepted: boolean | null = null;
       if (occupied) {
-        customerSTT = cellToString(rec.fields[dsStatus.sttRecent]);
-        customerName = cellToString(rec.fields[dsStatus.customerRecent]);
+        customerSTT = sttRecent;
+        customerName = customerRecent;
         const ci = customerName ? checkinByName.get(customerName) : undefined;
         productName = ci?.product ?? null;
         paymentNote = ci?.note ?? null;
+        deviceAccepted = ci?.deviceAccepted ?? null;
+        if (customerName) activeNames.add(customerName);
       }
 
       // Danh sách khách tiếp nhận: cụm Tư vấn lấy từ txConsult; cụm khác (hoặc
       // khi thiếu txConsult) fallback về "khách gần nhất" nếu đang phục vụ.
       const fallback: DeskCustomer[] =
         occupied && (customerName || customerSTT)
-          ? [{ stt: customerSTT, name: customerName, productName, paymentNote }]
+          ? [{ stt: customerSTT, name: customerName, productName, paymentNote, deviceAccepted }]
           : [];
       const receivedCustomers: DeskCustomer[] =
         cluster === 'consult' ? (receivedByDesk.get(code) ?? fallback) : fallback;
+      if (cluster === 'consult') {
+        for (const c of receivedCustomers) if (c.name) activeNames.add(c.name);
+      }
+
+      // Bàn vừa hoàn tất 1 khách và hiện rảnh → ứng viên "chờ điều phối".
+      if (!occupied && statusRecent === STATUS_COMPLETED && customerRecent) {
+        const ci = checkinByName.get(customerRecent);
+        completedCandidates.push({
+          stt: sttRecent,
+          name: customerRecent,
+          productName: ci?.product ?? null,
+          paymentNote: ci?.note ?? null,
+          deviceAccepted: ci?.deviceAccepted ?? null,
+          fromCluster: cluster,
+        });
+      }
 
       statesById[code] = {
         staffName: cellToString(rec.fields[dsFm.staff]),
@@ -147,9 +200,34 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
         customerName,
         productName,
         paymentNote,
+        deviceAccepted,
         receivedCustomers,
       };
     }
+  }
+
+  // "Chờ điều phối": hoàn tất 1 khâu nhưng chưa đang được phục vụ ở đâu khác
+  // (đã dispatch rồi thì loại; 1 khách chỉ hiện 1 lần dù hoàn tất ở nhiều bàn).
+  const dispatchSeen = new Set<string>();
+  const waitingDispatch: WaitingCustomer[] = [];
+  for (const cand of completedCandidates) {
+    if (!cand.name || activeNames.has(cand.name) || dispatchSeen.has(cand.name)) continue;
+    dispatchSeen.add(cand.name);
+    waitingDispatch.push(cand);
+  }
+
+  // "Chờ check-in": đã check-in (có STT) nhưng chưa từng xuất hiện ở bàn nào.
+  const waitingCheckin: WaitingCustomer[] = [];
+  for (const r of tables.checkin) {
+    const name = cellToString(r.fields[checkin.name]);
+    if (!name || everSeenNames.has(name) || activeNames.has(name)) continue;
+    waitingCheckin.push({
+      stt: cellToString(r.fields[checkin.stt]),
+      name,
+      productName: cellToString(r.fields[checkin.product]),
+      paymentNote: cellToString(r.fields[checkin.note]),
+      deviceAccepted: cellToBool(r.fields[checkin.deviceAccepted]),
+    });
   }
 
   const totalCheckIn = new Set(
@@ -161,5 +239,5 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
   // "Danh sách đơn hàng" — total registered (row count).
   const totalRegistered = tables.orders?.length ?? 0;
 
-  return { statesById, totalCheckIn, totalRegistered };
+  return { statesById, totalCheckIn, totalRegistered, waitingCheckin, waitingDispatch };
 }

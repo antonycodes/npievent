@@ -67,6 +67,25 @@ Màu bàn lấy từ cột **`Trạng thái hiện tại (kết quả chính)`**
 - **Thanh trạng thái** header: badge Mock/Live, giờ cập nhật, nút "Làm mới",
   link "Cài đặt Lark".
 
+### 2 khu vực chờ ngoài bàn (góc dưới-trái board)
+
+Hai hộp `WaitingZone` (trong `LayoutDashboard.tsx`) thay cho 2 vùng tĩnh cũ
+"Bàn đợi" / "PG phát STT", hiển thị chấm STT của khách **chưa gắn vào bàn cụ
+thể** — bấm 1 chấm → `WaitingPopover.tsx` (STT, tên, SP, ghi chú TT):
+
+- **Chờ check-in**: khách đã check-in (có STT ở bảng `Check in`) nhưng **chưa
+  từng xuất hiện** ở bất kỳ bàn DS nào (chưa được điều phối vào khâu nào cả).
+- **Chờ điều phối**: khách vừa **hoàn tất** 1 khâu (`Trạng thái gần nhất` =
+  "Hoàn tất") và bàn đó hiện đang **rảnh**, nhưng khách **chưa đang được phục
+  vụ** ở bàn nào khác — tức đang chờ điều phối viên đưa sang khâu tiếp theo
+  (vd: xong Thu cũ → chờ vào Tư vấn).
+
+Logic tính 2 danh sách này nằm trong `larkMapper.mapDeskStates` (trả thêm
+`waitingCheckin` / `waitingDispatch`), dùng lại đúng 2 bảng đã có (`DS *` +
+`Check in`) — **không cần thêm bảng hay cột Lark mới**. Đi qua
+`useDashboardData` → `DashboardPage` (state `selectedWaiting`, cùng nhóm loại
+trừ lẫn nhau với `selectedId`/`selectedCustomer`).
+
 ### Sidebar — phễu Check-in + số liệu cụm (`Sidebar.tsx`)
 
 - **Phễu khách** (đếm **khách distinct theo tên** để không trùng khi 1 người qua

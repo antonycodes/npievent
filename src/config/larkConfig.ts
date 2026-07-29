@@ -36,6 +36,7 @@ export interface CheckinFieldMap {
   name: string;
   product: string;
   note: string;
+  deviceAccepted: string;
 }
 
 /** Transaction table columns (danh sách khách tiếp nhận theo bàn). */
@@ -72,6 +73,7 @@ export const DEFAULT_CHECKIN_FIELDS: CheckinFieldMap = {
   name: 'Họ và tên',
   product: 'SP 1',
   note: 'Note UDTT',
+  deviceAccepted: 'Đã nghiệm thu thiết bị',
 };
 
 export const DEFAULT_TX_CONSULT_FIELDS: TxFieldMap = {
@@ -83,6 +85,9 @@ export const DEFAULT_TX_CONSULT_FIELDS: TxFieldMap = {
 
 /** Giá trị `Trạng thái` (bảng giao dịch) nghĩa là "đã tiếp nhận". */
 export const STATUS_RECEIVED = 'Tiếp nhận';
+
+/** Giá trị `Trạng thái gần nhất` (DS) nghĩa là bàn vừa hoàn tất 1 khách. */
+export const STATUS_COMPLETED = 'Hoàn tất';
 
 /**
  * `Trạng thái hiện tại` → desk UI status.

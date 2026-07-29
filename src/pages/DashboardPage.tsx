@@ -5,40 +5,62 @@ import { useCallback, useMemo, useState } from 'react';
 import CustomerPopover from '@/components/CustomerPopover';
 import DeskPopover from '@/components/DeskPopover';
 import FilterBar, { type DeskFilters } from '@/components/FilterBar';
-import LayoutDashboard from '@/components/LayoutDashboard';
+import LayoutDashboard, { WAITING_ZONE_ANCHOR, type WaitingZoneKey } from '@/components/LayoutDashboard';
 import Sidebar from '@/components/Sidebar';
 import StatusLegend from '@/components/StatusLegend';
+import WaitingPopover from '@/components/WaitingPopover';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { deskUiStatus } from '@/types/desk';
 
-const NO_FILTERS: DeskFilters = { onlyVacant: false, onlyTradein: false };
+const NO_FILTERS: DeskFilters = { onlyVacant: false, onlyTradein: false, onlyDeviceAccepted: false };
+
+const WAITING_ZONE_LABEL: Record<WaitingZoneKey, string> = {
+  checkin: 'Chờ check-in',
+  dispatch: 'Chờ điều phối',
+};
+
+const WAITING_ZONE_STATUS: Record<WaitingZoneKey, string> = {
+  checkin: 'Đã check-in — chờ điều phối vào bàn',
+  dispatch: 'Đã hoàn tất 1 khâu — chờ điều phối sang khâu tiếp theo',
+};
 
 export default function DashboardPage() {
-  const { desks, summary, loading, error, lastUpdated, isMock, refresh } = useDashboardData();
+  const { desks, summary, waitingCheckin, waitingDispatch, loading, error, lastUpdated, isMock, refresh } =
+    useDashboardData();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<{ deskId: string; index: number } | null>(null);
+  const [selectedWaiting, setSelectedWaiting] = useState<{ zone: WaitingZoneKey; index: number } | null>(null);
   const [filters, setFilters] = useState<DeskFilters>(NO_FILTERS);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedCustomer(null);
+    setSelectedWaiting(null);
     setSelectedId((prev) => (prev === id ? null : id));
   }, []);
 
   const handleSelectCustomer = useCallback((deskId: string, index: number) => {
     setSelectedId(null);
+    setSelectedWaiting(null);
     setSelectedCustomer((prev) =>
       prev?.deskId === deskId && prev?.index === index ? null : { deskId, index },
     );
   }, []);
 
+  const handleSelectWaiting = useCallback((zone: WaitingZoneKey, index: number) => {
+    setSelectedId(null);
+    setSelectedCustomer(null);
+    setSelectedWaiting((prev) => (prev?.zone === zone && prev?.index === index ? null : { zone, index }));
+  }, []);
+
   const dimmedIds = useMemo(() => {
-    if (!filters.onlyVacant && !filters.onlyTradein) return undefined;
+    if (!filters.onlyVacant && !filters.onlyTradein && !filters.onlyDeviceAccepted) return undefined;
     const set = new Set<string>();
     for (const d of desks) {
       const matches =
         (!filters.onlyVacant || deskUiStatus(d) === 'available') &&
-        (!filters.onlyTradein || d.cluster === 'tradein');
+        (!filters.onlyTradein || d.cluster === 'tradein') &&
+        (!filters.onlyDeviceAccepted || d.deviceAccepted === true);
       if (!matches) set.add(d.id);
     }
     return set;
@@ -55,6 +77,13 @@ export default function DashboardPage() {
     const customer = desk?.receivedCustomers?.[selectedCustomer.index];
     return desk && customer ? { desk, customer } : null;
   }, [desks, selectedCustomer, dimmedIds]);
+
+  const selectedWaitingData = useMemo(() => {
+    if (!selectedWaiting) return null;
+    const list = selectedWaiting.zone === 'checkin' ? waitingCheckin : waitingDispatch;
+    const customer = list[selectedWaiting.index];
+    return customer ? { zone: selectedWaiting.zone, customer } : null;
+  }, [selectedWaiting, waitingCheckin, waitingDispatch]);
 
   return (
     <div className="min-h-full bg-neutral-100 text-neutral-800">
@@ -125,6 +154,10 @@ export default function DashboardPage() {
               onSelect={handleSelect}
               onSelectCustomer={handleSelectCustomer}
               selectedCustomer={selectedCustomer}
+              waitingCheckin={waitingCheckin}
+              waitingDispatch={waitingDispatch}
+              onSelectWaiting={handleSelectWaiting}
+              selectedWaiting={selectedWaiting}
               dimmedIds={dimmedIds}
               overlay={
                 selectedDesk ? (
@@ -134,6 +167,15 @@ export default function DashboardPage() {
                     desk={selectedCustomerData.desk}
                     customer={selectedCustomerData.customer}
                     onClose={() => setSelectedCustomer(null)}
+                  />
+                ) : selectedWaitingData ? (
+                  <WaitingPopover
+                    zoneLabel={WAITING_ZONE_LABEL[selectedWaitingData.zone]}
+                    statusText={WAITING_ZONE_STATUS[selectedWaitingData.zone]}
+                    customer={selectedWaitingData.customer}
+                    x={WAITING_ZONE_ANCHOR[selectedWaitingData.zone].x}
+                    y={WAITING_ZONE_ANCHOR[selectedWaitingData.zone].y}
+                    onClose={() => setSelectedWaiting(null)}
                   />
                 ) : null
               }

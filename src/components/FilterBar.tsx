@@ -6,6 +6,7 @@
 export interface DeskFilters {
   onlyVacant: boolean;
   onlyTradein: boolean;
+  onlyDeviceAccepted: boolean;
 }
 
 interface FilterBarProps {
@@ -27,6 +28,9 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
       </Chip>
       <Chip active={filters.onlyTradein} onClick={() => toggle('onlyTradein')}>
         Chỉ hiện bàn Thu cũ
+      </Chip>
+      <Chip active={filters.onlyDeviceAccepted} onClick={() => toggle('onlyDeviceAccepted')}>
+        Chỉ hiện đã thu thiết bị
       </Chip>
     </div>
   );

@@ -373,3 +373,81 @@ Each DS table gained a Status block (same columns in all 3): `STT gần nhất
   updated. Negative `Sl khách chờ` (formula artifact, TC6=-1) clamped to 0.
 - Verified via screenshots: TC1-5 red, TC6 green (Rảnh), TV2/TV4 red, TV1/TV3
   green, BK1/BK2 red, others grey; TC1 popover shows customer, TC6 shows none.
+
+### 2 khu vực chờ ngoài bàn — Chờ check-in / Chờ điều phối (added 2026-07-29)
+User cung cấp screenshot mock-up của board với 2 hộp mới ở góc dưới-trái
+(thay cho 2 Region tĩnh cũ "Bàn đợi"/"PG phát STT"), mỗi hộp có vài chấm STT
+màu cam — yêu cầu: hiện khách **đã có STT nhưng chưa được điều phối vào bàn
+nào** (chờ check-in) và khách **vừa xong 1 khâu, chờ điều phối sang khâu tiếp
+theo** (vd xong Thu cũ → chờ vào Tư vấn).
+
+- **Không thêm bảng/cột Lark mới** — suy ra 2 danh sách này từ dữ liệu đã có:
+  - `types/desk.ts`: `WaitingCustomer extends DeskCustomer` + `fromCluster?`.
+  - `larkConfig.ts`: thêm `STATUS_COMPLETED = 'Hoàn tất'`.
+  - `larkMapper.mapDeskStates`: trong lúc build `statesById`, gom thêm
+    `everSeenNames` (mọi `Khách gần nhất` từng thấy, mọi trạng thái),
+    `activeNames` (khách đang occupied ở BẤT KỲ bàn nào, kể cả nhiều khách
+    consult), và `completedCandidates` (bàn `Trạng thái gần nhất` = "Hoàn tất"
+    + hiện đang rảnh). Sau vòng lặp:
+    - `waitingDispatch` = completedCandidates trừ đi ai đã có trong
+      `activeNames` (đã được điều phối đi rồi) + khử trùng theo tên.
+    - `waitingCheckin` = khách trong bảng `Check in` mà tên **không** nằm
+      trong `everSeenNames` lẫn `activeNames` (chưa từng chạm bàn nào).
+  - Trả thêm `waitingCheckin`/`waitingDispatch` trong `MappedData` →
+    `useDashboardData` (`RawState` + `UseDashboardDataResult`) → `DashboardPage`.
+- **UI**: `LayoutDashboard.tsx` có component `WaitingZone` (hộp viền cam nét
+  đứt, nhãn + hàng chấm STT bấm được) thay cho 2 `Region` cũ ở
+  `left-3% top-70%/85% h-14% w-15%`. Export `WAITING_ZONE_ANCHOR` (toạ độ neo
+  %) + `WaitingZoneKey` để `DashboardPage` định vị popover.
+- **Popover riêng**: `WaitingPopover.tsx` (mới) — cùng phong cách
+  `CustomerPopover` nhưng neo cố định theo khu vực (không theo bàn), luôn bung
+  lên trên (2 khu vực nằm sát đáy board). Hiện STT/tên/SP/ghi chú TT, cụm vừa
+  hoàn tất (nếu có).
+- `DashboardPage`: thêm state `selectedWaiting` (loại trừ lẫn nhau với
+  `selectedId`/`selectedCustomer`), handler `handleSelectWaiting`, nhánh
+  overlay thứ 3.
+- Với mock data hiện tại: `waitingCheckin` = 2 khách chưa từng vào bàn nào
+  (Lê Thanh My, Võ Thu Trang); `waitingDispatch` = 1 khách (Vũ Xuân Phong,
+  vừa xong TC6, chưa xuất hiện ở Tư vấn/Backup).
+- Không có Node/npm trong môi trường chỉnh sửa → chưa chạy được
+  `tsc`/`vite build` để verify, chỉ review code thủ công.
+
+**Verify run (2026-07-29, sau đó):** cài Node v24 portable (không có sẵn trong
+sandbox), `rm -rf node_modules package-lock.json` + `xattr -dr
+com.apple.quarantine .` để fix lỗi code-signature của binary native
+`@rollup/rollup-darwin-arm64` (dlopen bị chặn bởi Gatekeeper) rồi `npm install`
+lại sạch. `npx tsc -b --noEmit` không lỗi. `npm run dev` chạy OK (Vite v6.4.3,
+`localhost:5173`). Verify bằng browser preview: 2 hộp "Chờ check-in" (STT 7, 8)
+và "Chờ điều phối" (STT 7) hiện đúng chấm cam; bấm chấm STT mở đúng
+`WaitingPopover` (VD: STT 7 · Vũ Xuân Phong — Khu vực "Chờ điều phối", Trạng
+thái "Đã hoàn tất 1 khâu — chờ điều phối sang khâu tiếp theo", Vừa hoàn tất
+"Bàn thu cũ", tên SP "iPhone 17 Pro..."). Không có console error.
+
+### Bộ lọc nhanh "Chỉ hiện đã thu thiết bị" (added 2026-07-29)
+Yêu cầu: thêm 1 chip lọc nhanh dựa trên trường **"Đã nghiệm thu thiết bị"**
+(checkbox) trong bảng **Check-in** — chỉ tô sáng các bàn mà khách đang phục vụ
+đã được nghiệm thu thiết bị, các bàn khác bị làm mờ (giống cơ chế `onlyVacant`
+/ `onlyTradein` hiện có).
+
+- `larkConfig.ts`: `CheckinFieldMap` + `DEFAULT_CHECKIN_FIELDS` thêm
+  `deviceAccepted: 'Đã nghiệm thu thiết bị'`. `larkSettings.ts`:
+  `CHECKIN_LABELS` thêm nhãn tương ứng (tự hiện trong form mapping ở
+  SettingsPage vì component lặp theo `Object.keys(CHECKIN_LABELS)`).
+- `larkMapper.ts`: thêm `cellToBool()` (coerce boolean/"true"/"1"/"Có"/"x"...).
+  `indexCheckinByName` trả thêm `deviceAccepted: boolean` mỗi khách. Giá trị
+  này được join vào: khách đang phục vụ ở DS (`deviceAccepted` trong
+  `statesById[code]`), `receivedCustomers` (indexReceived, cụm Tư vấn),
+  `completedCandidates`/`waitingDispatch`, và `waitingCheckin` (đọc thẳng từ
+  Check-in). `DeskCustomer`/`DeskLiveState` (`types/desk.ts`) thêm field
+  `deviceAccepted?: boolean | null`.
+- **Chỉ set giá trị khi bàn đang occupied** (theo đúng pattern productName/
+  paymentNote hiện có) — bàn trống/idle có `deviceAccepted = null`, nên tự
+  động bị lọc mờ khi bật filter (không tính là "đã nghiệm thu").
+- `FilterBar.tsx`: `DeskFilters` thêm `onlyDeviceAccepted`, chip mới "Chỉ hiện
+  đã thu thiết bị". `DashboardPage.tsx`: `NO_FILTERS` + `dimmedIds` cộng thêm
+  điều kiện `d.deviceAccepted === true`.
+- Mock data (`mockLarkData.ts`): thêm cột `'Đã nghiệm thu thiết bị'` (bool) cho
+  8 khách check-in, trộn true/false để test dimming.
+- **Verify**: `npx tsc -b --noEmit` không lỗi. Test trên browser preview (bật
+  chip) — chỉ TC1/TC2/TC4/BK1 (khách có `true`) giữ màu, còn lại (TC3, TC5,
+  TC6, BK2, mọi TV) bị làm mờ đúng như kỳ vọng.

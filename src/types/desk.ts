@@ -32,6 +32,7 @@ export interface DeskCustomer {
   name: string | null; // tên (hiển thị khi hover / trong popover)
   productName?: string | null; // SP 1 (join Check in theo tên)
   paymentNote?: string | null; // Note UDTT (join Check in theo tên)
+  deviceAccepted?: boolean | null; // Đã nghiệm thu thiết bị (join Check in theo tên)
 }
 
 /** Số khách tối đa 1 nhân viên tiếp nhận đồng thời (theo cụm). */
@@ -40,6 +41,17 @@ export const DESK_CAPACITY: Record<ClusterKey, number> = {
   consult: 2,
   backup: 1,
 };
+
+/**
+ * Một khách đang ở khu vực chờ ngoài bàn (chưa gán vào bàn cụ thể):
+ *   - "Chờ check-in": đã check-in (có STT) nhưng chưa từng xuất hiện ở bàn nào.
+ *   - "Chờ điều phối": vừa hoàn tất 1 cụm (`fromCluster`) và đang rảnh, chờ
+ *     điều phối viên đưa sang cụm tiếp theo.
+ */
+export interface WaitingCustomer extends DeskCustomer {
+  /** Cụm vừa hoàn tất — chỉ có ở nhóm "Chờ điều phối". */
+  fromCluster?: ClusterKey | null;
+}
 
 /**
  * Live per-desk state merged from the DS registry (+ transaction join).
@@ -65,6 +77,7 @@ export interface DeskLiveState {
   customerName: string | null; // Khách gần nhất
   productName: string | null; // SP 1 (Check in, by name)
   paymentNote: string | null; // Note UDTT (Check in, by name)
+  deviceAccepted: boolean | null; // Đã nghiệm thu thiết bị (Check in, by name)
   /** Khách đang "Tiếp nhận" tại bàn (đã cắt tối đa theo DESK_CAPACITY). */
   receivedCustomers: DeskCustomer[];
 }
