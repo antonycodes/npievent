@@ -78,7 +78,9 @@ export default function DeskPopover({ desk, onClose }: DeskPopoverProps) {
                         <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-white">
                           {c.stt ?? '•'}
                         </span>
-                        <span className="flex-1 text-right font-medium text-neutral-800">
+                        <span
+                          className={`flex-1 text-right ${c.deviceAccepted ? 'font-bold text-red-600' : 'font-medium text-neutral-800'}`}
+                        >
                           {c.name ?? '—'}
                         </span>
                       </li>
@@ -86,7 +88,14 @@ export default function DeskPopover({ desk, onClose }: DeskPopoverProps) {
                   </ul>
                 </div>
               ) : (
-                <Row label="STT Khách" value={desk.customerSTT} />
+                <>
+                  <Row label="STT Khách" value={desk.customerSTT} />
+                  <Row
+                    label="Check thu máy cũ"
+                    value={desk.deviceAccepted ? 'Đã nghiệm thu' : 'Chưa nghiệm thu'}
+                    tone={desk.deviceAccepted ? 'red' : undefined}
+                  />
+                </>
               )}
               <Row label="Tên sản phẩm" value={desk.productName} />
               <Row label="Ghi chú thanh toán" value={desk.paymentNote} />
@@ -97,7 +106,7 @@ export default function DeskPopover({ desk, onClose }: DeskPopoverProps) {
             </div>
           )}
           {(desk.waiting ?? 0) > 0 && (
-            <Row label="Khách đang chờ" value={String(desk.waiting)} highlight />
+            <Row label="Khách đang chờ" value={String(desk.waiting)} tone="amber" />
           )}
         </dl>
 
@@ -117,18 +126,18 @@ export default function DeskPopover({ desk, onClose }: DeskPopoverProps) {
 function Row({
   label,
   value,
-  highlight,
+  tone,
 }: {
   label: string;
   value: string | null | undefined;
-  highlight?: boolean;
+  tone?: 'amber' | 'red';
 }) {
+  const cls =
+    tone === 'red' ? 'font-bold text-red-600' : tone === 'amber' ? 'font-medium text-amber-600' : 'font-medium text-neutral-800';
   return (
     <div className="flex justify-between gap-3">
       <dt className="shrink-0 text-neutral-500">{label}</dt>
-      <dd className={`text-right font-medium ${highlight ? 'text-amber-600' : 'text-neutral-800'}`}>
-        {value && value.trim() ? value : '—'}
-      </dd>
+      <dd className={`text-right ${cls}`}>{value && value.trim() ? value : '—'}</dd>
     </div>
   );
 }

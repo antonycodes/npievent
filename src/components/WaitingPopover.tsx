@@ -7,16 +7,29 @@
  * nằm sát mép dưới board.
  */
 import { useEffect } from 'react';
-import { CLUSTER_LABELS } from '@/config/layoutConfig';
-import type { WaitingCustomer } from '@/types/desk';
+import type { WaitingZoneKey } from '@/components/LayoutDashboard';
+import type { ClusterKey, WaitingCustomer } from '@/types/desk';
 
 interface WaitingPopoverProps {
   zoneLabel: string;
-  statusText: string;
+  zone: WaitingZoneKey;
   customer: WaitingCustomer;
   x: number;
   y: number;
   onClose: () => void;
+}
+
+/** Tên khâu ngắn gọn cho dòng "Trạng thái" — chỉ dùng ở popover này. */
+const STAGE_NAME: Record<ClusterKey, string> = {
+  tradein: 'Thu cũ',
+  consult: 'Tư vấn',
+  backup: 'Backup',
+};
+
+function statusTextFor(zone: WaitingZoneKey, customer: WaitingCustomer): string {
+  if (zone === 'checkin') return 'Đã check-in — chờ điều phối vào bàn';
+  const stage = customer.fromCluster ? STAGE_NAME[customer.fromCluster] : null;
+  return stage ? `Đã hoàn tất "Khâu ${stage}"` : 'Đã hoàn tất 1 khâu — chờ điều phối';
 }
 
 function translateX(x: number): string {
@@ -25,7 +38,7 @@ function translateX(x: number): string {
   return '-50%';
 }
 
-export default function WaitingPopover({ zoneLabel, statusText, customer, x, y, onClose }: WaitingPopoverProps) {
+export default function WaitingPopover({ zoneLabel, zone, customer, x, y, onClose }: WaitingPopoverProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -59,21 +72,35 @@ export default function WaitingPopover({ zoneLabel, statusText, customer, x, y, 
 
         <dl className="space-y-1.5 text-sm">
           <Row label="Khu vực" value={zoneLabel} />
-          <Row label="Trạng thái" value={statusText} />
-          {customer.fromCluster && <Row label="Vừa hoàn tất" value={CLUSTER_LABELS[customer.fromCluster]} />}
+          <Row label="Trạng thái" value={statusTextFor(zone, customer)} />
           <Row label="Tên sản phẩm" value={customer.productName ?? null} />
           <Row label="Ghi chú thanh toán" value={customer.paymentNote ?? null} />
+          <Row
+            label="Check thu máy cũ"
+            value={customer.deviceAccepted ? 'Đã nghiệm thu' : 'Chưa nghiệm thu'}
+            tone={customer.deviceAccepted ? 'red' : undefined}
+          />
         </dl>
       </div>
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: string | null | undefined }) {
+function Row({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string | null | undefined;
+  tone?: 'red';
+}) {
   return (
     <div className="flex justify-between gap-3">
       <dt className="shrink-0 text-neutral-500">{label}</dt>
-      <dd className="text-right font-medium text-neutral-800">{value && value.trim() ? value : '—'}</dd>
+      <dd className={`text-right ${tone === 'red' ? 'font-bold text-red-600' : 'font-medium text-neutral-800'}`}>
+        {value && value.trim() ? value : '—'}
+      </dd>
     </div>
   );
 }

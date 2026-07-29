@@ -19,11 +19,6 @@ const WAITING_ZONE_LABEL: Record<WaitingZoneKey, string> = {
   dispatch: 'Chờ điều phối',
 };
 
-const WAITING_ZONE_STATUS: Record<WaitingZoneKey, string> = {
-  checkin: 'Đã check-in — chờ điều phối vào bàn',
-  dispatch: 'Đã hoàn tất 1 khâu — chờ điều phối sang khâu tiếp theo',
-};
-
 export default function DashboardPage() {
   const { desks, summary, waitingCheckin, waitingDispatch, loading, error, lastUpdated, isMock, refresh } =
     useDashboardData();
@@ -171,7 +166,7 @@ export default function DashboardPage() {
                 ) : selectedWaitingData ? (
                   <WaitingPopover
                     zoneLabel={WAITING_ZONE_LABEL[selectedWaitingData.zone]}
-                    statusText={WAITING_ZONE_STATUS[selectedWaitingData.zone]}
+                    zone={selectedWaitingData.zone}
                     customer={selectedWaitingData.customer}
                     x={WAITING_ZONE_ANCHOR[selectedWaitingData.zone].x}
                     y={WAITING_ZONE_ANCHOR[selectedWaitingData.zone].y}

@@ -73,7 +73,7 @@ export const DEFAULT_CHECKIN_FIELDS: CheckinFieldMap = {
   name: 'Họ và tên',
   product: 'SP 1',
   note: 'Note UDTT',
-  deviceAccepted: 'Đã nghiệm thu thiết bị',
+  deviceAccepted: 'Check nghiệm thu',
 };
 
 export const DEFAULT_TX_CONSULT_FIELDS: TxFieldMap = {
