@@ -119,107 +119,103 @@ export default function LayoutDashboard({
   overlay,
 }: LayoutDashboardProps) {
   return (
-    <div className="relative aspect-video w-full">
-      {/* Board visuals clip to the rounded card; popovers stay outside this
-          layer (below) so they're never cut off near the board's edges. */}
-      <div className="absolute inset-0 overflow-hidden rounded-xl border border-neutral-300 bg-neutral-50 shadow-inner">
-        {/* ── Static venue backdrop ─────────────────────────────────── */}
-        <div className="absolute left-[34%] top-[6%] h-[36%] w-[44%] rounded-2xl border border-brand/30 bg-brand/10" />
-        <Region label="Sân khấu" className="left-[46%] top-[7%] h-[5%] w-[18%] border-brand/50 text-brand" />
-        <Region label="Upgrade" className="left-[3%] top-[8%] h-[9%] w-[15%] border-neutral-300 text-neutral-500" />
-        <Region label="Bàn thu ngân" className="left-[3%] top-[19%] h-[8%] w-[15%] border-neutral-300 text-neutral-500" />
-        <Region
-          label="Vách phụ kiện"
-          sub="Cố định · gắn LED"
-          className="left-[80%] top-[8%] h-[24%] w-[17%] border-brand/40 text-brand"
+    <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-neutral-300 bg-neutral-50 shadow-inner">
+      {/* ── Static venue backdrop ─────────────────────────────────── */}
+      <div className="absolute left-[34%] top-[6%] h-[36%] w-[44%] rounded-2xl border border-brand/30 bg-brand/10" />
+      <Region label="Sân khấu" className="left-[46%] top-[7%] h-[5%] w-[18%] border-brand/50 text-brand" />
+      <Region label="Upgrade" className="left-[3%] top-[8%] h-[9%] w-[15%] border-neutral-300 text-neutral-500" />
+      <Region label="Bàn thu ngân" className="left-[3%] top-[19%] h-[8%] w-[15%] border-neutral-300 text-neutral-500" />
+      <Region
+        label="Vách phụ kiện"
+        sub="Cố định · gắn LED"
+        className="left-[80%] top-[8%] h-[24%] w-[17%] border-brand/40 text-brand"
+      />
+      <Region label="Bàn demo 20 SP" className="left-[80%] top-[38%] h-[46%] w-[17%] border-neutral-300 text-neutral-500" />
+      <WaitingZone
+        label="Chờ check-in"
+        items={waitingCheckin}
+        selectedIndex={selectedWaiting?.zone === 'checkin' ? selectedWaiting.index : null}
+        onSelect={(i) => onSelectWaiting?.('checkin', i)}
+        className="left-[3%] top-[70%] h-[14%] w-[15%]"
+      />
+      <WaitingZone
+        label="Chờ điều phối"
+        items={waitingDispatch}
+        selectedIndex={selectedWaiting?.zone === 'dispatch' ? selectedWaiting.index : null}
+        onSelect={(i) => onSelectWaiting?.('dispatch', i)}
+        className="left-[3%] top-[85%] h-[14%] w-[15%]"
+      />
+      <Region label="Cổng" className="left-[42%] top-[88%] h-[8%] w-[16%] border-neutral-300 text-neutral-500" />
+
+      {/* ── Cluster captions ──────────────────────────────────────── */}
+      <ClusterCaption text="Thu cũ" className="left-[13%] top-[29%]" />
+      <ClusterCaption text="Tư vấn" className="left-[55%] top-[43%]" />
+
+      {/* ── Interactive desks (38) ────────────────────────────────── */}
+      {desks.map((d) => (
+        <Desk
+          key={d.id}
+          id={d.id}
+          type={d.cluster}
+          status={deskUiStatus(d)}
+          staffName={d.staffName}
+          customerSTT={d.customerSTT}
+          waiting={d.waiting}
+          x={d.x}
+          y={d.y}
+          selected={selectedId === d.id}
+          dimmed={dimmedIds?.has(d.id)}
+          onClick={onSelect}
         />
-        <Region label="Bàn demo 20 SP" className="left-[80%] top-[38%] h-[46%] w-[17%] border-neutral-300 text-neutral-500" />
-        <WaitingZone
-          label="Chờ check-in"
-          items={waitingCheckin}
-          selectedIndex={selectedWaiting?.zone === 'checkin' ? selectedWaiting.index : null}
-          onSelect={(i) => onSelectWaiting?.('checkin', i)}
-          className="left-[3%] top-[70%] h-[14%] w-[15%]"
-        />
-        <WaitingZone
-          label="Chờ điều phối"
-          items={waitingDispatch}
-          selectedIndex={selectedWaiting?.zone === 'dispatch' ? selectedWaiting.index : null}
-          onSelect={(i) => onSelectWaiting?.('dispatch', i)}
-          className="left-[3%] top-[85%] h-[14%] w-[15%]"
-        />
-        <Region label="Cổng" className="left-[42%] top-[88%] h-[8%] w-[16%] border-neutral-300 text-neutral-500" />
+      ))}
 
-        {/* ── Cluster captions ──────────────────────────────────────── */}
-        <ClusterCaption text="Thu cũ" className="left-[13%] top-[29%]" />
-        <ClusterCaption text="Tư vấn" className="left-[55%] top-[43%]" />
+      {/* ── Chấm STT khách đã tiếp nhận (mọi cụm) — bấm để xem khách ── */}
+      {desks.map((d) => {
+        const list = d.receivedCustomers ?? [];
+        if (list.length === 0) return null;
+        const dim = dimmedIds?.has(d.id) ? 'pointer-events-none opacity-15' : '';
 
-        {/* ── Interactive desks (38) ────────────────────────────────── */}
-        {desks.map((d) => (
-          <Desk
-            key={d.id}
-            id={d.id}
-            type={d.cluster}
-            status={deskUiStatus(d)}
-            staffName={d.staffName}
-            customerSTT={d.customerSTT}
-            waiting={d.waiting}
-            x={d.x}
-            y={d.y}
-            selected={selectedId === d.id}
-            dimmed={dimmedIds?.has(d.id)}
-            onClick={onSelect}
-          />
-        ))}
-
-        {/* ── Chấm STT khách đã tiếp nhận (mọi cụm) — bấm để xem khách ── */}
-        {desks.map((d) => {
-          const list = d.receivedCustomers ?? [];
-          if (list.length === 0) return null;
-          const dim = dimmedIds?.has(d.id) ? 'pointer-events-none opacity-15' : '';
-
-          const Dot = (c: (typeof list)[number], i: number) => {
-            const active = selectedCustomer?.deskId === d.id && selectedCustomer?.index === i;
-            return (
-              <button
-                key={i}
-                type="button"
-                title={`${c.stt ? `#${c.stt} · ` : ''}${c.name ?? ''}`}
-                onClick={() => onSelectCustomer?.(d.id, i)}
-                className={[
-                  'flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1',
-                  'text-[9px] font-bold text-white shadow ring-1 ring-white transition hover:scale-125',
-                  active ? 'z-30 ring-2 ring-blue-500 ring-offset-1 scale-125' : '',
-                ].join(' ')}
-              >
-                {c.stt ?? '•'}
-              </button>
-            );
-          };
-
-          // 1 khách → badge ở góc phải-dưới node (tránh đè bàn hàng dưới).
-          // ≥2 khách → hàng chấm ngay dưới node.
-          return list.length === 1 ? (
-            <div
-              key={`dots-${d.id}`}
-              className={`absolute z-20 ${dim}`}
-              style={{ left: `${d.x}%`, top: `${d.y}%`, transform: 'translate(4px, 6px)' }}
+        const Dot = (c: (typeof list)[number], i: number) => {
+          const active = selectedCustomer?.deskId === d.id && selectedCustomer?.index === i;
+          return (
+            <button
+              key={i}
+              type="button"
+              title={`${c.stt ? `#${c.stt} · ` : ''}${c.name ?? ''}`}
+              onClick={() => onSelectCustomer?.(d.id, i)}
+              className={[
+                'flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1',
+                'text-[9px] font-bold text-white shadow ring-1 ring-white transition hover:scale-125',
+                active ? 'z-30 ring-2 ring-blue-500 ring-offset-1 scale-125' : '',
+              ].join(' ')}
             >
-              {Dot(list[0], 0)}
-            </div>
-          ) : (
-            <div
-              key={`dots-${d.id}`}
-              className={`absolute z-20 flex -translate-x-1/2 gap-1 ${dim}`}
-              style={{ left: `${d.x}%`, top: `calc(${d.y}% + 22px)` }}
-            >
-              {list.map(Dot)}
-            </div>
+              {c.stt ?? '•'}
+            </button>
           );
-        })}
-      </div>
+        };
 
-      {/* ── Overlay (popover) — outside the clipped layer above ────── */}
+        // 1 khách → badge ở góc phải-dưới node (tránh đè bàn hàng dưới).
+        // ≥2 khách → hàng chấm ngay dưới node.
+        return list.length === 1 ? (
+          <div
+            key={`dots-${d.id}`}
+            className={`absolute z-20 ${dim}`}
+            style={{ left: `${d.x}%`, top: `${d.y}%`, transform: 'translate(4px, 6px)' }}
+          >
+            {Dot(list[0], 0)}
+          </div>
+        ) : (
+          <div
+            key={`dots-${d.id}`}
+            className={`absolute z-20 flex -translate-x-1/2 gap-1 ${dim}`}
+            style={{ left: `${d.x}%`, top: `calc(${d.y}% + 22px)` }}
+          >
+            {list.map(Dot)}
+          </div>
+        );
+      })}
+
+      {/* ── Overlay (popover) ─────────────────────────────────────── */}
       {overlay}
     </div>
   );

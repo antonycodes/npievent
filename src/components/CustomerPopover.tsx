@@ -27,18 +27,11 @@ export default function CustomerPopover({ desk, customer, onClose }: CustomerPop
   }, [onClose]);
 
   const { x, y, id, cluster, staffName } = desk;
-  // Bung xuống dưới chấm STT như trước; nhưng nếu bàn đã ở nửa dưới board thì
-  // bung lên trên bàn để card (giờ dài hơn, có thêm dòng "Check thu máy cũ")
-  // không bị cắt bởi mép dưới board (overflow-hidden).
-  const below = y < 45;
-  const transform = below
-    ? `translate(${translateX(x)}, 40px)`
-    : `translate(${translateX(x)}, calc(-100% - 16px))`;
 
   return (
     <div
       className="absolute z-50"
-      style={{ left: `${x}%`, top: `${y}%`, transform }}
+      style={{ left: `${x}%`, top: `calc(${y}% + 40px)`, transform: `translate(${translateX(x)}, 0)` }}
       role="dialog"
       aria-label={`Khách STT ${customer.stt ?? ''}`}
     >
@@ -67,30 +60,17 @@ export default function CustomerPopover({ desk, customer, onClose }: CustomerPop
           <Row label="Nhân viên" value={staffName ?? null} />
           <Row label="Tên sản phẩm" value={customer.productName ?? null} />
           <Row label="Ghi chú thanh toán" value={customer.paymentNote ?? null} />
-          <Row
-            label="Check thu máy cũ"
-            value={customer.deviceAccepted ? 'Đã nghiệm thu' : 'Chưa nghiệm thu'}
-            tone={customer.deviceAccepted ? 'red' : undefined}
-          />
         </dl>
       </div>
     </div>
   );
 }
 
-function Row({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string | null | undefined;
-  tone?: 'red';
-}) {
+function Row({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="flex justify-between gap-3">
       <dt className="shrink-0 text-neutral-500">{label}</dt>
-      <dd className={`text-right ${tone === 'red' ? 'font-bold text-red-600' : 'font-medium text-neutral-800'}`}>
+      <dd className="text-right font-medium text-neutral-800">
         {value && value.trim() ? value : '—'}
       </dd>
     </div>

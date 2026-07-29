@@ -199,7 +199,7 @@ export const CHECKIN_LABELS: Record<keyof CheckinFieldMap, string> = {
   name: 'Họ và tên',
   product: 'Tên sản phẩm (SP 1)',
   note: 'Ghi chú thanh toán',
-  deviceAccepted: 'Check nghiệm thu (đã thu máy cũ)',
+  deviceAccepted: 'Đã nghiệm thu thiết bị',
 };
 
 export const TX_FIELD_LABELS: Record<keyof TxFieldMap, string> = {

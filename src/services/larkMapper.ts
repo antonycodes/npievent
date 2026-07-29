@@ -46,22 +46,13 @@ export function cellToNumber(v: LarkCellValue): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-const TRUTHY_TEXT = new Set(['true', '1', 'x', 'có', 'yes', 'checked']);
+const TRUTHY_TEXT = new Set(['true', '1', 'x', 'có', 'yes', 'đã nghiệm thu', 'checked']);
 
-/**
- * Coerce a Lark cell to boolean. Handles a plain checkbox (boolean) and the
- * real "Check nghiệm thu" field, which is a FORMULA column rendering as a
- * colored tag string — "✅ Đã nghiệm thu (1) máy" / "❌ Chưa nghiệm thu máy" —
- * so match by emoji/keyword rather than exact string (the trailing count varies).
- */
+/** Coerce a Lark checkbox/text cell (boolean, "true", "1", "Có", ...) to boolean. */
 export function cellToBool(v: LarkCellValue): boolean {
   if (typeof v === 'boolean') return v;
   const s = cellToString(v);
-  if (!s) return false;
-  const norm = s.trim().toLowerCase();
-  if (norm.includes('✅') || norm.includes('đã nghiệm thu')) return true;
-  if (norm.includes('❌') || norm.includes('chưa nghiệm thu')) return false;
-  return TRUTHY_TEXT.has(norm);
+  return s ? TRUTHY_TEXT.has(s.trim().toLowerCase()) : false;
 }
 
 const CLUSTERS: ClusterKey[] = ['tradein', 'consult', 'backup'];
@@ -77,24 +68,16 @@ export interface MappedData {
   waitingDispatch: WaitingCustomer[];
 }
 
-/**
- * Index Check-in rows by customer name → { stt, product, note, deviceAccepted }.
- *
- * Check-in's `STT` is the ONE canonical queue number for a customer — assigned
- * once at check-in and unchanged for the whole event. DS tables also carry a
- * local "STT gần nhất (helper)" per stage, but that is a per-stage helper, not
- * an identity — never use it to label a customer.
- */
+/** Index Check-in rows by customer name → { product, note, deviceAccepted }. */
 function indexCheckinByName(
   rows: LarkRecord[],
   fm: CheckinFieldMap,
-): Map<string, { stt: string | null; product: string | null; note: string | null; deviceAccepted: boolean }> {
-  const m = new Map<string, { stt: string | null; product: string | null; note: string | null; deviceAccepted: boolean }>();
+): Map<string, { product: string | null; note: string | null; deviceAccepted: boolean }> {
+  const m = new Map<string, { product: string | null; note: string | null; deviceAccepted: boolean }>();
   for (const r of rows) {
     const name = cellToString(r.fields[fm.name]);
     if (name) {
       m.set(name, {
-        stt: cellToString(r.fields[fm.stt]),
         product: cellToString(r.fields[fm.product]),
         note: cellToString(r.fields[fm.note]),
         deviceAccepted: cellToBool(r.fields[fm.deviceAccepted]),
@@ -109,7 +92,7 @@ function indexReceived(
   rows: LarkRecord[],
   fm: TxFieldMap,
   cap: number,
-  checkinByName: Map<string, { stt: string | null; product: string | null; note: string | null; deviceAccepted: boolean }>,
+  checkinByName: Map<string, { product: string | null; note: string | null; deviceAccepted: boolean }>,
 ): Map<string, DeskCustomer[]> {
   const m = new Map<string, DeskCustomer[]>();
   for (const r of rows) {
@@ -120,10 +103,8 @@ function indexReceived(
     if (list.length < cap) {
       const name = cellToString(r.fields[fm.name]);
       const ci = name ? checkinByName.get(name) : undefined;
-      // STT hiển thị luôn lấy từ Check-in (canonical) — bỏ qua cột "STT" cục bộ
-      // của bảng giao dịch (không đảm bảo là số duy nhất theo suốt sự kiện).
       list.push({
-        stt: ci?.stt ?? null,
+        stt: cellToString(r.fields[fm.stt]),
         name,
         productName: ci?.product ?? null,
         paymentNote: ci?.note ?? null,
@@ -158,6 +139,7 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
 
       const currentStatus = cellToString(rec.fields[dsStatus.currentStatus]);
       const statusRecent = cellToString(rec.fields[dsStatus.statusRecent]);
+      const sttRecent = cellToString(rec.fields[dsStatus.sttRecent]);
       const customerRecent = cellToString(rec.fields[dsStatus.customerRecent]);
       const partial: Partial<DeskLiveState> = { currentStatus, hasData: true };
       const occupied = deskUiStatus(partial) === 'occupied';
@@ -171,11 +153,9 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
       let paymentNote: string | null = null;
       let deviceAccepted: boolean | null = null;
       if (occupied) {
+        customerSTT = sttRecent;
         customerName = customerRecent;
         const ci = customerName ? checkinByName.get(customerName) : undefined;
-        // STT hiển thị = STT duy nhất của khách trong Check-in (không phải
-        // "STT gần nhất (helper)" cục bộ của DS — cái đó chỉ là phụ trợ).
-        customerSTT = ci?.stt ?? null;
         productName = ci?.product ?? null;
         paymentNote = ci?.note ?? null;
         deviceAccepted = ci?.deviceAccepted ?? null;
@@ -198,7 +178,7 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
       if (!occupied && statusRecent === STATUS_COMPLETED && customerRecent) {
         const ci = checkinByName.get(customerRecent);
         completedCandidates.push({
-          stt: ci?.stt ?? null,
+          stt: sttRecent,
           name: customerRecent,
           productName: ci?.product ?? null,
           paymentNote: ci?.note ?? null,
