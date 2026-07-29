@@ -3,8 +3,10 @@
  *
  * Renders a 16:9 stage mirroring the event photo: fixed venue regions as a
  * backdrop plus the 38 interactive desks (driven by the `desks` array), plus
- * 2 waiting-area boxes (Chờ check-in / Chờ điều phối) for customers not yet
- * assigned to a desk.
+ * 2 waiting-area boxes on the right (ĐÃ CHECK-IN / Chờ điều phối, at the old
+ * Vách phụ kiện / Bàn demo spots) for customers not yet assigned to a desk.
+ * "End Flow" (đã hoàn tất toàn bộ) is a separate table view, not a board zone
+ * — see EndFlowTable, opened from a button in FilterBar.
  */
 import { deskUiStatus, type DeskData, type WaitingCustomer } from '@/types/desk';
 import Desk from './Desk';
@@ -14,8 +16,8 @@ export type WaitingZoneKey = 'checkin' | 'dispatch';
 
 /** Toạ độ neo (giữa hộp, %) — dùng chung cho popover ở DashboardPage. */
 export const WAITING_ZONE_ANCHOR: Record<WaitingZoneKey, { x: number; y: number }> = {
-  checkin: { x: 10.5, y: 70 },
-  dispatch: { x: 10.5, y: 85 },
+  checkin: { x: 88.5, y: 20 },
+  dispatch: { x: 88.5, y: 61 },
 };
 
 interface LayoutDashboardProps {
@@ -84,11 +86,11 @@ function WaitingZone({
         {items.length === 0 ? (
           <span className="text-[10px] italic text-neutral-400">Không có khách</span>
         ) : (
-          items.map((c, i) => (
+          items.map((item, i) => (
             <button
               key={i}
               type="button"
-              title={`${c.stt ? `#${c.stt} · ` : ''}${c.name ?? ''}`}
+              title={`${item.stt ? `#${item.stt} · ` : ''}${item.name ?? ''}`}
               onClick={() => onSelect?.(i)}
               className={[
                 'flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1',
@@ -96,7 +98,7 @@ function WaitingZone({
                 selectedIndex === i ? 'z-30 ring-2 ring-blue-500 ring-offset-1 scale-110' : '',
               ].join(' ')}
             >
-              {c.stt ?? '•'}
+              {item.stt ?? '•'}
             </button>
           ))
         )}
@@ -128,25 +130,19 @@ export default function LayoutDashboard({
         <Region label="Sân khấu" className="left-[46%] top-[7%] h-[5%] w-[18%] border-brand/50 text-brand" />
         <Region label="Upgrade" className="left-[3%] top-[8%] h-[9%] w-[15%] border-neutral-300 text-neutral-500" />
         <Region label="Bàn thu ngân" className="left-[3%] top-[19%] h-[8%] w-[15%] border-neutral-300 text-neutral-500" />
-        <Region
-          label="Vách phụ kiện"
-          sub="Cố định · gắn LED"
-          className="left-[80%] top-[8%] h-[24%] w-[17%] border-brand/40 text-brand"
-        />
-        <Region label="Bàn demo 20 SP" className="left-[80%] top-[38%] h-[46%] w-[17%] border-neutral-300 text-neutral-500" />
         <WaitingZone
-          label="Chờ check-in"
+          label="Đã check-in"
           items={waitingCheckin}
           selectedIndex={selectedWaiting?.zone === 'checkin' ? selectedWaiting.index : null}
           onSelect={(i) => onSelectWaiting?.('checkin', i)}
-          className="left-[3%] top-[70%] h-[14%] w-[15%]"
+          className="left-[80%] top-[8%] h-[24%] w-[17%]"
         />
         <WaitingZone
           label="Chờ điều phối"
           items={waitingDispatch}
           selectedIndex={selectedWaiting?.zone === 'dispatch' ? selectedWaiting.index : null}
           onSelect={(i) => onSelectWaiting?.('dispatch', i)}
-          className="left-[3%] top-[85%] h-[14%] w-[15%]"
+          className="left-[80%] top-[38%] h-[46%] w-[17%]"
         />
         <Region label="Cổng" className="left-[42%] top-[88%] h-[8%] w-[16%] border-neutral-300 text-neutral-500" />
 

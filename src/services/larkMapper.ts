@@ -75,21 +75,39 @@ export interface MappedData {
   waitingCheckin: WaitingCustomer[];
   /** Vừa hoàn tất 1 cụm, bàn đang rảnh, chưa được điều phối sang cụm tiếp theo. */
   waitingDispatch: WaitingCustomer[];
+  /** Đã hoàn tất toàn bộ quy trình (Check-in cột "End flow" = "End flow"). */
+  endFlow: WaitingCustomer[];
+}
+
+const END_FLOW_DONE = 'end flow';
+
+/** Check-in "End flow" — "End flow" (đã xong toàn bộ) vs "In flow" (đang trong luồng). */
+function isEndFlowValue(v: LarkCellValue): boolean {
+  const s = cellToString(v);
+  return s ? s.trim().toLowerCase() === END_FLOW_DONE : false;
+}
+
+interface CheckinIndexEntry {
+  stt: string | null;
+  product: string | null;
+  note: string | null;
+  deviceAccepted: boolean;
+  /** Khâu vừa hoàn tất (Check-in cột "Done in Flow") — chỉ có ý nghĩa khi khách đã xong 1 khâu. */
+  doneInFlow: string | null;
+  /** Đã hoàn tất toàn bộ quy trình (Check-in cột "End flow"). */
+  endFlow: boolean;
 }
 
 /**
- * Index Check-in rows by customer name → { stt, product, note, deviceAccepted }.
+ * Index Check-in rows by customer name.
  *
  * Check-in's `STT` is the ONE canonical queue number for a customer — assigned
  * once at check-in and unchanged for the whole event. DS tables also carry a
  * local "STT gần nhất (helper)" per stage, but that is a per-stage helper, not
  * an identity — never use it to label a customer.
  */
-function indexCheckinByName(
-  rows: LarkRecord[],
-  fm: CheckinFieldMap,
-): Map<string, { stt: string | null; product: string | null; note: string | null; deviceAccepted: boolean }> {
-  const m = new Map<string, { stt: string | null; product: string | null; note: string | null; deviceAccepted: boolean }>();
+function indexCheckinByName(rows: LarkRecord[], fm: CheckinFieldMap): Map<string, CheckinIndexEntry> {
+  const m = new Map<string, CheckinIndexEntry>();
   for (const r of rows) {
     const name = cellToString(r.fields[fm.name]);
     if (name) {
@@ -98,6 +116,8 @@ function indexCheckinByName(
         product: cellToString(r.fields[fm.product]),
         note: cellToString(r.fields[fm.note]),
         deviceAccepted: cellToBool(r.fields[fm.deviceAccepted]),
+        doneInFlow: cellToString(r.fields[fm.doneInFlow]),
+        endFlow: isEndFlowValue(r.fields[fm.endFlow]),
       });
     }
   }
@@ -109,7 +129,7 @@ function indexReceived(
   rows: LarkRecord[],
   fm: TxFieldMap,
   cap: number,
-  checkinByName: Map<string, { stt: string | null; product: string | null; note: string | null; deviceAccepted: boolean }>,
+  checkinByName: Map<string, CheckinIndexEntry>,
 ): Map<string, DeskCustomer[]> {
   const m = new Map<string, DeskCustomer[]>();
   for (const r of rows) {
@@ -204,6 +224,7 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
           paymentNote: ci?.note ?? null,
           deviceAccepted: ci?.deviceAccepted ?? null,
           fromCluster: cluster,
+          doneInFlow: ci?.doneInFlow ?? null,
         });
       }
 
@@ -227,11 +248,13 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
   }
 
   // "Chờ điều phối": hoàn tất 1 khâu nhưng chưa đang được phục vụ ở đâu khác
-  // (đã dispatch rồi thì loại; 1 khách chỉ hiện 1 lần dù hoàn tất ở nhiều bàn).
+  // (đã dispatch rồi thì loại; đã "End flow" toàn bộ thì cũng loại — không cần
+  // điều phối thêm nữa; 1 khách chỉ hiện 1 lần dù hoàn tất ở nhiều bàn).
   const dispatchSeen = new Set<string>();
   const waitingDispatch: WaitingCustomer[] = [];
   for (const cand of completedCandidates) {
     if (!cand.name || activeNames.has(cand.name) || dispatchSeen.has(cand.name)) continue;
+    if (checkinByName.get(cand.name)?.endFlow) continue;
     dispatchSeen.add(cand.name);
     waitingDispatch.push(cand);
   }
@@ -250,6 +273,20 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
     });
   }
 
+  // "End Flow": đã hoàn tất toàn bộ quy trình (Check-in cột "End flow").
+  const endFlow: WaitingCustomer[] = [];
+  for (const [name, ci] of checkinByName) {
+    if (!ci.endFlow) continue;
+    endFlow.push({
+      stt: ci.stt,
+      name,
+      productName: ci.product,
+      paymentNote: ci.note,
+      deviceAccepted: ci.deviceAccepted,
+      doneInFlow: ci.doneInFlow,
+    });
+  }
+
   const totalCheckIn = new Set(
     tables.checkin
       .map((r) => cellToString(r.fields[checkin.stt]))
@@ -259,5 +296,5 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
   // "Danh sách đơn hàng" — total registered (row count).
   const totalRegistered = tables.orders?.length ?? 0;
 
-  return { statesById, totalCheckIn, totalRegistered, waitingCheckin, waitingDispatch };
+  return { statesById, totalCheckIn, totalRegistered, waitingCheckin, waitingDispatch, endFlow };
 }

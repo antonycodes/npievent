@@ -12,9 +12,14 @@ export interface DeskFilters {
 interface FilterBarProps {
   filters: DeskFilters;
   onChange: (next: DeskFilters) => void;
+  /** Số khách đã "End flow" — hiện badge trên nút. */
+  endFlowCount: number;
+  /** Bảng End Flow đang mở hay không (viền nổi bật khi mở). */
+  endFlowOpen: boolean;
+  onToggleEndFlow: () => void;
 }
 
-export default function FilterBar({ filters, onChange }: FilterBarProps) {
+export default function FilterBar({ filters, onChange, endFlowCount, endFlowOpen, onToggleEndFlow }: FilterBarProps) {
   const toggle = (key: keyof DeskFilters) =>
     onChange({ ...filters, [key]: !filters[key] });
 
@@ -31,6 +36,9 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
       </Chip>
       <Chip active={filters.onlyDeviceAccepted} onClick={() => toggle('onlyDeviceAccepted')}>
         Chỉ hiện đã thu thiết bị
+      </Chip>
+      <Chip active={endFlowOpen} onClick={onToggleEndFlow}>
+        End Flow{endFlowCount > 0 ? ` (${endFlowCount})` : ''}
       </Chip>
     </div>
   );

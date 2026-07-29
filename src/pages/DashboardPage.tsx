@@ -4,6 +4,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import CustomerPopover from '@/components/CustomerPopover';
 import DeskPopover from '@/components/DeskPopover';
+import EndFlowTable from '@/components/EndFlowTable';
 import FilterBar, { type DeskFilters } from '@/components/FilterBar';
 import LayoutDashboard, { WAITING_ZONE_ANCHOR, type WaitingZoneKey } from '@/components/LayoutDashboard';
 import Sidebar from '@/components/Sidebar';
@@ -15,18 +16,19 @@ import { deskUiStatus } from '@/types/desk';
 const NO_FILTERS: DeskFilters = { onlyVacant: false, onlyTradein: false, onlyDeviceAccepted: false };
 
 const WAITING_ZONE_LABEL: Record<WaitingZoneKey, string> = {
-  checkin: 'Chờ check-in',
+  checkin: 'Đã check-in',
   dispatch: 'Chờ điều phối',
 };
 
 export default function DashboardPage() {
-  const { desks, summary, waitingCheckin, waitingDispatch, loading, error, lastUpdated, isMock, refresh } =
+  const { desks, summary, waitingCheckin, waitingDispatch, endFlow, loading, error, lastUpdated, isMock, refresh } =
     useDashboardData();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<{ deskId: string; index: number } | null>(null);
   const [selectedWaiting, setSelectedWaiting] = useState<{ zone: WaitingZoneKey; index: number } | null>(null);
   const [filters, setFilters] = useState<DeskFilters>(NO_FILTERS);
+  const [showEndFlow, setShowEndFlow] = useState(false);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedCustomer(null);
@@ -136,9 +138,15 @@ export default function DashboardPage() {
       </header>
 
       <main className="px-6 py-6">
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mb-4 flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
           <StatusLegend />
-          <FilterBar filters={filters} onChange={setFilters} />
+          <FilterBar
+            filters={filters}
+            onChange={setFilters}
+            endFlowCount={endFlow.length}
+            endFlowOpen={showEndFlow}
+            onToggleEndFlow={() => setShowEndFlow((v) => !v)}
+          />
         </div>
 
         <div className="flex flex-col gap-6 lg:flex-row">
@@ -179,6 +187,8 @@ export default function DashboardPage() {
           <Sidebar summary={summary} />
         </div>
       </main>
+
+      {showEndFlow && <EndFlowTable customers={endFlow} onClose={() => setShowEndFlow(false)} />}
     </div>
   );
 }

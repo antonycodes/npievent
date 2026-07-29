@@ -200,6 +200,8 @@ export const CHECKIN_LABELS: Record<keyof CheckinFieldMap, string> = {
   product: 'Tên sản phẩm (SP 1)',
   note: 'Ghi chú thanh toán',
   deviceAccepted: 'Check nghiệm thu (đã thu máy cũ)',
+  doneInFlow: 'Done in Flow (khâu vừa hoàn tất)',
+  endFlow: 'End flow (đã xong toàn bộ quy trình)',
 };
 
 export const TX_FIELD_LABELS: Record<keyof TxFieldMap, string> = {

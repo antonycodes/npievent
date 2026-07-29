@@ -593,3 +593,151 @@ User hỏi: "Số 1 đã nghiệm thu 1 máy, tại sao hiển thị chưa nghi�
   thành công) — nghi do dữ liệu thật đang tự động refresh mỗi 30s (đây là sự
   kiện đang diễn ra thật) làm re-render đúng lúc click, không phải bug ở
   handler. Không đáng để sửa (test-tooling timing, không phải bug sản phẩm).
+
+### "Trạng thái" ở Chờ điều phối đổi nguồn: đọc "Done in Flow" thay vì tự suy (2026-07-29)
+User: cột "Done in Flow" (ban đầu định làm bảng "Điều phối" riêng, nhưng đã
+**update trực tiếp vào Check-in** — đỡ phải thêm bảng/route proxy mới) —
+dùng giá trị này để điền dòng "Trạng thái" thay vì tự suy `fromCluster` như
+trước.
+
+- `larkConfig.ts`: `CheckinFieldMap` + `DEFAULT_CHECKIN_FIELDS` thêm
+  `doneInFlow: 'Done in Flow'`. `larkSettings.ts`: nhãn tương ứng.
+- `larkMapper.ts`: đặt tên type `CheckinIndexEntry` cho object trả về của
+  `indexCheckinByName` (trước đó inline lặp lại 2 chỗ) — thêm field
+  `doneInFlow`. `completedCandidates.push` thêm `doneInFlow: ci?.doneInFlow
+  ?? null`.
+- `types/desk.ts`: `WaitingCustomer` thêm `doneInFlow?: string | null`.
+- `WaitingPopover.tsx::statusTextFor`: ưu tiên `customer.doneInFlow`, chỉ
+  fallback về `STAGE_NAME[fromCluster]` (suy từ DS) khi thiếu. **Có guard**:
+  giá trị thật `"Check in"` (Lark trả cho khách CHƯA hoàn tất khâu nào — dùng
+  làm baseline mặc định của formula, không phải tên khâu) bị loại, không hiện
+  "Khâu Check in" — coi như thiếu, rơi về fallback.
+- Field thật dạng rich-text segment array (`[{text,type}]`), không phải string
+  thô — `cellToString()` đã tự xử lý đúng (nhánh `Array.isArray`), không cần
+  sửa gì thêm.
+- Mock data: thêm `'Done in Flow': 'Thu cũ'` cho Vũ Xuân Phong (ci_6, khách
+  waitingDispatch duy nhất trong mock).
+- **Verify bằng dữ liệu live thật** (module thật, không viết lại logic):
+  `waitingDispatch` trả `{name: 'Nguyễn Minh Long', fromCluster: 'tradein',
+  doneInFlow: 'Tư vấn'}` — **chứng minh rõ lý do cần đổi**: cách suy cũ
+  (`fromCluster`) nói anh ấy "vừa xong Thu cũ" (dữ liệu cũ/stale tại thời điểm
+  DS ghi nhận), còn "Done in Flow" thật nói đúng hơn là "Tư vấn" (anh ấy đã
+  tiến xa hơn từ đó, do đây là sự kiện đang chạy real-time). Popover render
+  đúng: `Trạng thái: Đã hoàn tất "Khâu Tư vấn"`. `tsc --noEmit` sạch.
+
+### Zone thứ 3 "End Flow" — khách đã xong toàn bộ quy trình (2026-07-29)
+User: Check-in có thêm cột **"End flow"** — giá trị `"End flow"` = khách đã
+xong toàn bộ (không cần điều phối thêm), `"In flow"` = vẫn đang trong luồng.
+Tạo 1 danh sách/zone riêng cho nhóm đã xong.
+
+- Đã verify field thật trước khi code (`fetch` trực tiếp qua proxy): tên cột
+  đúng là `"End flow"` (f thường), giá trị đúng 2 case `"End flow"` /
+  `"In flow"`, dạng rich-text array giống "Done in Flow" — `cellToString` đã
+  xử lý đúng, không cần sửa.
+- `larkConfig.ts`: `CheckinFieldMap` + default thêm `endFlow: 'End flow'`.
+  `larkSettings.ts`: nhãn.
+- `larkMapper.ts`: `CheckinIndexEntry` thêm `endFlow: boolean` (qua helper
+  `isEndFlowValue()`, so khớp case-insensitive với hằng `'end flow'`).
+  `MappedData` thêm field `endFlow: WaitingCustomer[]` — build bằng cách lọc
+  trực tiếp từ `checkinByName` (đã index sẵn, không cần quét lại
+  `tables.checkin`). **Quan trọng**: loại khách đã `endFlow` ra khỏi
+  `waitingDispatch` (thêm 1 dòng check trong vòng lặp cuối) — nếu không, 1
+  khách có thể vừa hiện ở "Chờ điều phối" vừa hiện ở "End Flow" cùng lúc (do
+  DS vẫn còn ghi "Hoàn tất" trong khi Check-in đã báo xong hẳn).
+- `useDashboardData.ts`: `RawState`/`EMPTY`/`UseDashboardDataResult` thêm
+  `endFlow`.
+- `LayoutDashboard.tsx`: `WaitingZoneKey` thêm `'endFlow'`. `WaitingZone` thêm
+  prop `tone?: 'amber' | 'emerald'` (trước giờ hardcode amber) — "End Flow"
+  dùng tone emerald để phân biệt trực quan với 2 zone "đang chờ" (amber).
+  Đặt ở góc dưới-phải board (`left-80% top-85% h-13% w-17%`) — khoảng trống
+  duy nhất còn lại (dưới panel "Bàn demo 20 SP", vốn dừng ở top-38%+h-46%=84%)
+  vì cột trái đã kín chỗ bởi 2 zone cũ + bàn Thu cũ.
+- `WaitingPopover.tsx::statusTextFor`: thêm case `zone === 'endFlow'` →
+  "Đã hoàn tất toàn bộ quy trình".
+- `DashboardPage.tsx`: `WAITING_ZONE_LABEL.endFlow = 'End Flow'`;
+  `selectedWaitingData` đổi từ ternary 2 nhánh sang lookup object 3 nhánh.
+- Mock data: thêm hằng `IN_FLOW`/`END_FLOW`, gán `'End flow'` cho Huỳnh Ngọc
+  Linh (ci_2) để test — lưu ý cô ấy vẫn "occupied" ở TC2/BK1 trong mock đồng
+  thời (mock vốn không hoàn toàn nhất quán về narrative, chỉ cốt test đúng
+  code path).
+- **Verify data thật**: `mapped.endFlow` → `[{name: 'Nguyễn Minh Long', stt:
+  '1', doneInFlow: 'Back-up', deviceAccepted: true}]`; đồng thời xác nhận anh
+  ấy KHÔNG còn xuất hiện trong `waitingDispatch` nữa (trước đó có) — đúng như
+  thiết kế loại trừ lẫn nhau. Verify UI (mock mode, tạm bật rồi trả lại
+  `useMock: false` như cũ sau khi xong): zone "END FLOW" hiện đúng màu
+  emerald, popover Huỳnh Ngọc Linh hiện đủ: Khu vực "End Flow", Trạng thái
+  "Đã hoàn tất toàn bộ quy trình", SP, Check thu máy cũ (đỏ). `tsc --noEmit`
+  sạch, không lỗi console mới.
+
+### Bố trí lại board + End Flow đổi sang dạng bảng (2026-07-29, sau đó)
+User: chuyển "Chờ check-in" sang chỗ "Vách phụ kiện" (đổi nhãn "ĐÃ CHECK-IN"),
+chuyển "Chờ điều phối" sang chỗ "Bàn demo 20 SP"; "End Flow" đổi hẳn sang
+dạng xem bảng (table), có nút riêng ở khu "Lọc nhanh" thay vì 1 zone trên
+board — không còn dùng cơ chế chấm STT + popover cho nhóm này nữa.
+
+- `LayoutDashboard.tsx`: xoá 2 `Region` tĩnh "Vách phụ kiện" (`left-80%
+  top-8% h-24% w-17%`) và "Bàn demo 20 SP" (`left-80% top-38% h-46% w-17%`) —
+  2 `WaitingZone` cũ chiếm đúng 2 vị trí đó (check-in nhãn đổi thành
+  "Đã check-in", điều phối giữ nguyên nhãn). Xoá `WaitingZone` "End Flow" +
+  revert `WaitingZoneKey` về lại `'checkin' | 'dispatch'` (bỏ `'endFlow'`) +
+  revert `WAITING_ZONE_ANCHOR`/`WaitingZone` bỏ luôn cơ chế `tone` (chỉ còn
+  1 tone amber, không cần enum nữa vì emerald đã hết chỗ dùng). Cột trái
+  (Upgrade/Bàn thu ngân/Thu cũ) hết bị 2 zone cũ chiếm chỗ phía dưới.
+- **`EndFlowTable.tsx`** (file mới): modal (`fixed inset-0 z-50`, backdrop
+  đen mờ, đóng khi click backdrop / nút × / phím Escape — thêm `useEffect`
+  keydown giống 3 popover kia cho nhất quán) chứa `<table>` liệt kê toàn bộ
+  `endFlow` list: STT | Họ và tên | Tên sản phẩm | Ghi chú thanh toán | Check
+  thu máy cũ (đỏ khi đã nghiệm thu) | Khâu cuối (`doneInFlow`).
+- `FilterBar.tsx`: thêm props `endFlowCount`/`endFlowOpen`/`onToggleEndFlow`,
+  chip thứ 4 "End Flow (n)" (tái dùng `Chip`, không phải filter dimming thật —
+  chỉ toggle mở modal, không đụng `dimmedIds`).
+- `DashboardPage.tsx`: state mới `showEndFlow`; `WAITING_ZONE_LABEL` +
+  `selectedWaitingData` revert về 2 nhánh (bỏ endFlow); render
+  `{showEndFlow && <EndFlowTable .../>}` như 1 overlay độc lập ngoài
+  `LayoutDashboard` (không còn truyền `endFlow` prop vào board nữa, chỉ dùng
+  trực tiếp trong trang).
+- **Verify**: `tsc --noEmit` sạch (bắt được 1 lỗi so sánh union-type thiếu
+  sót ở `WaitingPopover.tsx` — quên xoá nhánh `zone === 'endFlow'` cũ, đã
+  sửa). UI live: 2 zone hiện đúng vị trí mới, nút "End Flow (n)" đúng badge
+  đếm, bấm mở modal đúng (cả case rỗng lẫn có data — test qua mock), Escape
+  đóng modal hoạt động sau khi thêm handler. Có vài dòng lỗi console
+  "[vite] Failed to reload LayoutDashboard.tsx" — xác nhận là stale (cùng 1
+  timestamp cũ, lặp lại y hệt qua nhiều lần reload sau đó) từ 1 lần HMR đua
+  race lúc toggle mock/live liên tục, không phải lỗi hiện tại — trang render
+
+### Responsive fix: desktop 1920×1080 + iPad 11"/13" (2026-07-29, sau đó)
+User yêu cầu tối ưu/fix layout cho đúng 2 nhóm thiết bị. Dùng
+`resize_window` (Browser pane) để test thật ở 5 viewport: 1920×1080 (desktop),
+1194×834 + 834×1194 (iPad 11" ngang/dọc), 1366×1024 + 1024×1366 (iPad 13"
+ngang/dọc) — đo bằng `getBoundingClientRect()` thật, không đoán qua ảnh chụp
+(ảnh chụp bị scale-down nên nhìn "thấy" khoảng trắng thừa ở 1920 nhưng đo ra
+flex-1 vẫn lấp đầy đúng, chỉ là ảo giác do ảnh thu nhỏ).
+
+- **Bug tìm thấy**: hàng `StatusLegend` + `FilterBar` (trong `DashboardPage.
+  tsx`) dùng `lg:flex-row lg:justify-between` (bật ở 1024px) — nhưng đo ra
+  2 khối này cần tổng **~1246px** mới đủ chỗ nằm 1 hàng không xuống dòng. Ở
+  MỌI viewport iPad ngang/dọc đã test (1194, 1366, và biên 1024) đều
+  **≥1024 nhưng <1246**, nên `flex-row` bật nhưng cả 2 khối lại tự
+  flex-wrap RIÊNG — 2 chuỗi wrap độc lập nằm cạnh nhau tạo cảm giác nội dung
+  bị xáo trộn xen kẽ (dòng 1: vài mục legend + vài chip filter, dòng 2: mục
+  legend còn lại + chip còn lại), rất khó đọc. Chỉ iPad 11" dọc (834px, dưới
+  1024) không dính vì chưa bật `flex-row`.
+- **Fix**: đổi `lg:` → `2xl:` (1536px) cho đúng 1 hàng này (không đụng hàng
+  board+sidebar, vẫn dùng `lg:flex-row` vì đã test ổn ở mọi kích thước). 1536
+  vừa đủ an toàn dưới ngưỡng 1246px cần thiết (dư ~290px) mà vẫn dưới 1920 —
+  nghĩa là desktop giữ nguyên 1 hàng như cũ, còn CẢ 4 kích thước iPad giờ đơn
+  giản xếp dọc (giống hệt cách iPad 11" dọc vốn đã hiển thị sạch) thay vì cố
+  nhét 1 hàng rồi vỡ.
+- Verify lại đủ 5 viewport sau fix: cả 4 iPad đều xếp dọc sạch (không còn xen
+  kẽ), 1920×1080 vẫn 1 hàng như cũ. Popover (desk lẫn waiting-zone, kể cả 2
+  zone mới dời sang phải ở x≈88.5%) vẫn nằm trong viewport ở 1194px
+  (`offScreen: false`, đo bằng `getBoundingClientRect`). `tsc --noEmit` sạch.
+- **Chưa sửa (chỉ ghi nhận, chưa làm)**: touch-target trên iPad nhỏ hơn
+  khuyến nghị 44×44pt của Apple HIG — nút bàn 36px (`h-9`), chấm STT khu chờ
+  20px (`h-5`), chấm khách dưới bàn 16px (`h-4`). Không tăng ngay vì rủi ro:
+  ở board thu nhỏ (vd iPad dọc, board ~786px width), khoảng cách dọc giữa 1
+  hàng chấm STT và HÀNG BÀN KẾ TIẾP ở cụm Tư vấn (3 hàng, cách nhau 13% —
+  ~57px ở board 442px cao) đã khá sít; tăng size chấm có thể gây đè lên bàn
+  hàng dưới, cần tính lại toạ độ `layoutConfig.ts` cẩn thận chứ không chỉ đổi
+  class — để user quyết định có muốn làm tiếp không.
+  đúng hoàn toàn qua screenshot.

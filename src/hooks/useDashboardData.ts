@@ -25,6 +25,7 @@ interface RawState {
   totalRegistered: number;
   waitingCheckin: WaitingCustomer[];
   waitingDispatch: WaitingCustomer[];
+  endFlow: WaitingCustomer[];
 }
 
 const EMPTY: RawState = {
@@ -33,6 +34,7 @@ const EMPTY: RawState = {
   totalRegistered: 0,
   waitingCheckin: [],
   waitingDispatch: [],
+  endFlow: [],
 };
 
 export interface UseDashboardDataResult {
@@ -42,6 +44,8 @@ export interface UseDashboardDataResult {
   waitingCheckin: WaitingCustomer[];
   /** Vừa hoàn tất 1 cụm, chờ điều phối sang cụm tiếp theo. */
   waitingDispatch: WaitingCustomer[];
+  /** Đã hoàn tất toàn bộ quy trình (Check-in "End flow"). */
+  endFlow: WaitingCustomer[];
   loading: boolean;
   error: string | null;
   lastUpdated: Date | null;
@@ -118,6 +122,7 @@ export function useDashboardData(): UseDashboardDataResult {
     summary,
     waitingCheckin: raw.waitingCheckin,
     waitingDispatch: raw.waitingDispatch,
+    endFlow: raw.endFlow,
     loading,
     error,
     lastUpdated,

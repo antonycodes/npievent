@@ -37,6 +37,10 @@ export interface CheckinFieldMap {
   product: string;
   note: string;
   deviceAccepted: string;
+  /** Khâu vừa hoàn tất (formula) — dùng cho dòng "Trạng thái" ở "Chờ điều phối". */
+  doneInFlow: string;
+  /** Đã xong toàn bộ quy trình chưa (formula) — giá trị "End flow" | "In flow". */
+  endFlow: string;
 }
 
 /** Transaction table columns (danh sách khách tiếp nhận theo bàn). */
@@ -74,6 +78,8 @@ export const DEFAULT_CHECKIN_FIELDS: CheckinFieldMap = {
   product: 'SP 1',
   note: 'Note UDTT',
   deviceAccepted: 'Check nghiệm thu',
+  doneInFlow: 'Done in Flow',
+  endFlow: 'End flow',
 };
 
 export const DEFAULT_TX_CONSULT_FIELDS: TxFieldMap = {

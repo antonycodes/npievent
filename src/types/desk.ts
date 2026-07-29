@@ -51,6 +51,8 @@ export const DESK_CAPACITY: Record<ClusterKey, number> = {
 export interface WaitingCustomer extends DeskCustomer {
   /** Cụm vừa hoàn tất — chỉ có ở nhóm "Chờ điều phối". */
   fromCluster?: ClusterKey | null;
+  /** Tên khâu vừa hoàn tất, lấy trực tiếp từ Check-in cột "Done in Flow". */
+  doneInFlow?: string | null;
 }
 
 /**

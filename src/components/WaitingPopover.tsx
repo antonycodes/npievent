@@ -19,16 +19,20 @@ interface WaitingPopoverProps {
   onClose: () => void;
 }
 
-/** Tên khâu ngắn gọn cho dòng "Trạng thái" — chỉ dùng ở popover này. */
+/** Fallback nếu Check-in chưa có "Done in Flow" — suy từ cụm vừa hoàn tất. */
 const STAGE_NAME: Record<ClusterKey, string> = {
   tradein: 'Thu cũ',
   consult: 'Tư vấn',
   backup: 'Backup',
 };
 
+/** "Done in Flow" cũng dùng giá trị này cho khách chưa xong khâu nào — không tính là tên khâu. */
+const NOT_A_STAGE = 'check in';
+
 function statusTextFor(zone: WaitingZoneKey, customer: WaitingCustomer): string {
   if (zone === 'checkin') return 'Đã check-in — chờ điều phối vào bàn';
-  const stage = customer.fromCluster ? STAGE_NAME[customer.fromCluster] : null;
+  const doneInFlow = customer.doneInFlow?.trim().toLowerCase() === NOT_A_STAGE ? null : customer.doneInFlow;
+  const stage = doneInFlow || (customer.fromCluster ? STAGE_NAME[customer.fromCluster] : null);
   return stage ? `Đã hoàn tất "Khâu ${stage}"` : 'Đã hoàn tất 1 khâu — chờ điều phối';
 }
 
