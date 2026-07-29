@@ -451,3 +451,145 @@ Yêu cầu: thêm 1 chip lọc nhanh dựa trên trường **"Đã nghiệm thu 
 - **Verify**: `npx tsc -b --noEmit` không lỗi. Test trên browser preview (bật
   chip) — chỉ TC1/TC2/TC4/BK1 (khách có `true`) giữ màu, còn lại (TC3, TC5,
   TC6, BK2, mọi TV) bị làm mờ đúng như kỳ vọng.
+
+### Sửa 3 hiểu sai + 1 bug clipping phát sinh (2026-07-29)
+User phản hồi code hiểu sai vài ý sau khi xem bản build đầu:
+
+1. **STT khách phải lấy từ Check-in, không phải "Phụ-STT"** — mỗi khách có 1
+   STT duy nhất, cấp 1 lần lúc check-in, theo suốt sự kiện. Trước đó
+   `customerSTT`/badge STT ở DS-occupied-desk và ở `receivedCustomers` (cụm Tư
+   vấn, qua `txConsult`) đang lấy từ 2 cột **cục bộ/phụ trợ khác nhau mỗi
+   bàn**: `dsStatus.sttRecent` ("STT gần nhất (helper)") và `txConsult.stt`
+   ("STT" trong bảng Giao dịch Tư vấn) — 2 cột này KHÔNG đảm bảo là số duy
+   nhất/cố định của khách (ví dụ đã bắt gặp: khách "Vũ Xuân Phong" checkin
+   STT=6 nhưng DS helper lại ghi "7" — trùng ngẫu nhiên với STT thật của một
+   khách khác). Fix: `larkMapper.ts` — `indexCheckinByName` giờ trả thêm
+   `stt` (từ `checkin.stt`, nguồn canonical); mọi nơi gán `stt` cho
+   `DeskCustomer`/`WaitingCustomer` (main loop, `indexReceived`,
+   `completedCandidates`) đổi sang `ci?.stt ?? null`, bỏ hẳn
+   `dsStatus.sttRecent` khỏi luồng hiển thị (biến `sttRecent` xoá luôn, không
+   còn nơi nào dùng). Field mapping `sttRecent`/`txConsult.stt` trong
+   config/Settings vẫn giữ nguyên (cột đó có thể vẫn tồn tại bên Lark cho mục
+   đích khác), chỉ là mapper không còn đọc nó để gắn nhãn khách nữa.
+2. **Thêm dòng "Check thu máy cũ"** — lấy đúng cột **"Check Nghiệm thu"**
+   trong Check-in (trước đó turn trước bịa tên cột "Đã nghiệm thu thiết bị" vì
+   chưa có tên thật — nay sửa `DEFAULT_CHECKIN_FIELDS.deviceAccepted` +
+   mock data sang `'Check Nghiệm thu'`). Thêm 1 dòng label mới, đỏ khi đã
+   nghiệm thu, ở cả 3 popover: `CustomerPopover.tsx`, `WaitingPopover.tsx`
+   ("Check thu máy cũ" / "Đã nghiệm thu" đỏ / "Chưa nghiệm thu" xám), và
+   `DeskPopover.tsx` (thêm row tương tự ở nhánh 1-khách; ở nhánh danh sách
+   nhiều khách — tên khách tô đỏ+đậm thay vì thêm dòng riêng, giữ layout gọn).
+   Row `Row` component ở cả 3 file đổi từ `highlight?: boolean` (hoặc không
+   có) sang `tone?: 'amber' | 'red'` để dùng chung cho cả trạng thái "khách
+   chờ" (amber, cũ) và "đã nghiệm thu" (red, mới).
+3. **"Trạng thái" ở popover "Chờ điều phối" phải động theo khâu vừa xong** —
+   trước đó là text tĩnh giống nhau cho mọi khách ("Đã hoàn tất 1 khâu — chờ
+   điều phối sang khâu tiếp theo"). Nay `WaitingPopover.tsx` tự tính
+   `statusTextFor(zone, customer)`: `checkin` giữ nguyên text cũ; `dispatch`
+   → `Đã hoàn tất "Khâu ${STAGE_NAME[customer.fromCluster]}"` (vd `Đã hoàn tất
+   "Khâu Thu cũ"`), dùng map cục bộ `STAGE_NAME` (tradein→Thu cũ,
+   consult→Tư vấn, backup→Backup) — ngắn gọn hơn `CLUSTER_LABELS` (tránh lặp
+   chữ "Bàn"). Xoá row "Vừa hoàn tất" riêng (đã gộp vào "Trạng thái"), xoá
+   `WAITING_ZONE_STATUS` ở `DashboardPage.tsx` (không còn dùng), đổi prop
+   `WaitingPopover` từ `statusText: string` → `zone: WaitingZoneKey`.
+4. **Bug tự phát hiện khi verify**: thêm dòng "Check thu máy cũ" làm
+   `CustomerPopover` cao hơn → bị cắt bởi `overflow-hidden` của board ở những
+   bàn nửa dưới (vd TC4, y=42%) — kể cả sau khi thêm logic lật lên/xuống
+   (ngưỡng `y<45`) vẫn còn ca giữa board không đủ chỗ cả 2 phía ở viewport
+   thường. **Fix gốc rễ** (không phải vá ngưỡng): `LayoutDashboard.tsx` —
+   tách lớp `overflow-hidden` (chỉ bọc phần visual: backdrop/regions/desks)
+   ra khỏi lớp ngoài chứa `overlay`; overlay giờ là sibling *sau* lớp clip,
+   cùng nằm trong 1 `<div className="relative aspect-video ...">` ngoài cùng
+   (không đổi toạ độ %, vì lớp clip là `absolute inset-0` = same size). Nhờ
+   vậy popover không bao giờ bị ẩn bởi mép board nữa, dù văn bản dài cỡ nào.
+   `CustomerPopover.tsx` vẫn giữ thêm logic lật lên khi `y>=45` (UX, không
+   phải bắt buộc để tránh clip nữa) như `DeskPopover` đã làm từ trước.
+- **Verify**: `npx tsc -b --noEmit` không lỗi (`noUnusedLocals` bắt hết biến
+  chết khi bỏ `sttRecent`). Browser preview: badge "Chờ điều phối" đổi đúng
+  từ #7 (sai) → #6 (đúng, STT thật của Vũ Xuân Phong); popover khách đó hiện
+  "Trạng thái: Đã hoàn tất "Khâu Thu cũ"" + "Check thu máy cũ: Đã nghiệm thu"
+  (đỏ); TC4/Dương Xuân Long — popover đầy đủ 5 dòng, không còn bị cắt; filter
+  "Chỉ hiện đã thu thiết bị" vẫn hoạt động đúng sau khi đổi tên cột.
+
+### Sửa tiếp: "Check nghiệm thu" là formula field, không phải checkbox (2026-07-29)
+User gửi screenshot cột thật trong Lark: có icon `fx` (formula field), giá trị
+là **text dạng tag màu** chứ không phải boolean thô — `✅ Đã nghiệm thu (n)
+máy` (xanh) / `❌ Chưa nghiệm thu máy` (đỏ). `cellToBool()` lúc đó chỉ so
+khớp CHÍNH XÁC chuỗi `"đã nghiệm thu"` → sẽ luôn trả `false` (sai) với giá trị
+thật vì lệch chuỗi (thừa emoji + "(n) máy"). Tên cột cũng lệch case: mình đặt
+mặc định `"Check Nghiệm thu"` (N hoa), thật ra là `"Check nghiệm thu"` (n
+thường).
+
+- Fix `larkMapper.ts::cellToBool` — match theo **emoji/từ khoá substring**
+  thay vì so khớp chuỗi chính xác: chứa `✅` hoặc `"đã nghiệm thu"` → `true`;
+  chứa `❌` hoặc `"chưa nghiệm thu"` → `false`; rỗng/null → `false`.
+- Sửa `DEFAULT_CHECKIN_FIELDS.deviceAccepted` + `CHECKIN_LABELS.deviceAccepted`
+  → `'Check nghiệm thu'` (đúng case thật). Mock data (`mockLarkData.ts`) đổi
+  từ `true`/`false` thô sang đúng 2 chuỗi tag thật (`DA_NGHIEM_THU`/
+  `CHUA_NGHIEM_THU` const) để mock test đúng code path thật (chuỗi), không
+  đi tắt qua nhánh `typeof v === 'boolean'`.
+- **Verify mạnh hơn hẳn bình thường**: phát hiện browser (Browser pane) đã có
+  sẵn kết nối Lark thật đã lưu trong localStorage (`useMock:false`, proxy
+  `npi-event-lark-proxy.minhthanhbrvt95.workers.dev` — cấu hình có sẵn của
+  user, không đụng vào/không reset). Gọi thẳng `fetch()` tới proxy thật ngay
+  trong page để lấy JSON gốc bảng Check-in, xác nhận:
+  - Tên cột thật đúng 100% là `"Check nghiệm thu"`.
+  - Giá trị thật đúng 100% là `"✅ Đã nghiệm thu (1) máy"` /
+    `"❌ Chưa nghiệm thu máy"` / `null` (khi chưa có dữ liệu) — cả 3 case đều
+    được `cellToBool` xử lý đúng.
+  - Bảng Check-in thật có ĐỦ 5 cột kiểu STT khác nhau: `STT`, `Phụ_STT`,
+    `STT Input`, `STT_Selection`, `Check STT` — xác nhận đúng nghi vấn ban đầu
+    của user (cột `Phụ_STT` có thật, tách biệt với `STT` chính) → càng chắc
+    chắn quyết định dùng `checkin.stt` (mặc định `'STT'`) làm nguồn canonical
+    là đúng.
+  - Test trực tiếp trên dữ liệu thật qua UI: khách "Nguyễn Minh Long" ở khu
+    "Chờ điều phối" hiện đúng "Trạng thái: Đã hoàn tất "Khâu Thu cũ"" và
+    "Check thu máy cũ: Chưa nghiệm thu" — khớp dữ liệu Lark thật.
+- Không đổi `useMock`/setting kết nối của user — đây là cấu hình riêng của
+  họ, chỉ dùng để verify rồi để nguyên hiện trạng.
+- **Sai lầm trong lần verify trên** (dòng ngay trên): kết luận "Chưa nghiệm
+  thu" của Nguyễn Minh Long là "khớp dữ liệu thật" là SAI — xem entry ngay
+  dưới, đây thực ra là do saved-settings mapping cũ, không phải dữ liệu thật.
+
+### Sửa tiếp: saved Settings đè lên default mới, khiến field cũ ("Check
+Nghiệm thu" hoa) vẫn được dùng dù code đã sửa (2026-07-29, sau đó)
+User hỏi: "Số 1 đã nghiệm thu 1 máy, tại sao hiển thị chưa nghiệm thu" —
+đúng, đây là **bug thật**, không phải nhầm lẫn của user.
+
+- **Root cause**: `larkSettingsStore` (`larkSettings.ts`) persist TOÀN BỘ
+  settings (kể cả field-mapping) vào `localStorage` (`npievent-lark-settings-
+  v1`). `hydrate()` merge: `{...base.fields.checkin, ...(saved.fields.checkin
+  ?? {})}` — nếu key `deviceAccepted` ĐÃ có trong bản saved thì nó LUÔN thắng
+  default trong code, bất kể sau này code đổi default bao nhiêu lần. Trình
+  duyệt test đã có sẵn bản save cũ với `deviceAccepted: "Check Nghiệm thu"`
+  (hoa, từ default SAI của mình ở lần sửa trước) — nên dù code đã đổi default
+  thành `"Check nghiệm thu"` (thường), app vẫn đọc field SAI TÊN (không tồn
+  tại trong data thật) → `cellToBool(undefined)` → luôn `false`.
+- **Đây là lỗi có thể xảy ra với chính user** nếu họ từng mở trang Cài đặt
+  Lark và bấm Lưu bất kỳ lúc nào giữa lúc mình thêm field này và lúc sửa case
+  — cần họ tự kiểm tra/sửa tay, code không thể tự "di chuyển" giá trị đã lưu
+  của người dùng.
+- **Fix trong phiên preview này**: gọi thẳng
+  `larkSettingsStore.save({...current, fields: {...current.fields, checkin:
+  {...current.fields.checkin, deviceAccepted: 'Check nghiệm thu'}}})` qua
+  console (tương đương việc tự tay sửa ô "Check nghiệm thu" trong Cài đặt Lark
+  rồi bấm "Lưu & đồng bộ"), sau đó `navigate()` reload lại để app đọc settings
+  mới từ đầu (import động không share instance module với app đang chạy nên
+  phải reload thật).
+- **Verify lại bằng module thật** (gọi trực tiếp `mapDeskStates` +
+  `fetchLarkData` + `toFieldConfig` của app, KHÔNG tự viết lại logic) — làm 2
+  lần độc lập, cả 2 lần đều cho kết quả nhất quán:
+  `toFieldConfig().checkin.deviceAccepted === 'Check nghiệm thu'` và
+  `waitingDispatch` có `{name: 'Nguyễn Minh Long', deviceAccepted: true}`.
+  Đây là bằng chứng đáng tin hơn screenshot/click UI vì gọi thẳng hàm mapper
+  thật app dùng.
+- **Lưu ý cho user**: nếu họ xem app ở một bản deploy/trình duyệt KHÁC (không
+  phải preview này), họ cần tự vào **Cài đặt Lark** → mục "Check in" → sửa ô
+  "Check nghiệm thu (đã thu máy cũ)" đúng chữ thường "Check nghiệm thu" → bấm
+  "Lưu & đồng bộ". KHÔNG dùng nút "Khôi phục mặc định" vì nó reset luôn
+  apiUrl/proxy thật của họ.
+- Click UI để xác nhận trực quan bị **flaky trên bản live** (đôi khi
+  `.click()` không mở được popover dù `props.onClick` gọi trực tiếp luôn
+  thành công) — nghi do dữ liệu thật đang tự động refresh mỗi 30s (đây là sự
+  kiện đang diễn ra thật) làm re-render đúng lúc click, không phải bug ở
+  handler. Không đáng để sửa (test-tooling timing, không phải bug sản phẩm).
