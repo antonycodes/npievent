@@ -23,8 +23,8 @@ export interface TablePosition {
   y: number;
 }
 
-/** Visual state of a desk node. */
-export type DeskUiStatus = 'idle' | 'available' | 'occupied';
+/** Visual state of a desk node — chỉ 2 màu: xanh (rảnh) / đỏ (có khách). */
+export type DeskUiStatus = 'available' | 'occupied';
 
 /** Một khách đang được tiếp nhận tại bàn (chấm STT dưới node). */
 export interface DeskCustomer {
@@ -37,9 +37,9 @@ export interface DeskCustomer {
 
 /** Số khách tối đa 1 nhân viên tiếp nhận đồng thời (theo cụm). */
 export const DESK_CAPACITY: Record<ClusterKey, number> = {
-  tradein: 1,
+  tradein: 2,
   consult: 2,
-  backup: 1,
+  backup: 2,
 };
 
 /**
@@ -57,7 +57,7 @@ export interface WaitingCustomer extends DeskCustomer {
 
 /**
  * Live per-desk state merged from the DS registry (+ transaction join).
- * All fields optional so a desk with no data still renders (idle/grey).
+ * All fields optional so a desk with no data still renders (as available).
  */
 export interface DeskLiveState {
   /** Assigned staff — DS `NV Tư vấn` / `Nhân viên`. */
@@ -72,7 +72,7 @@ export interface DeskLiveState {
   currentStatus: string | null;
   /** Derived from currentStatus → occupied (red). */
   isOccupied: boolean;
-  /** true once this desk was seen in the data (else UI stays idle/grey). */
+  /** true once this desk was seen in the data (chỉ dùng cho thống kê "X/Y bàn"). */
   hasData: boolean;
   // ── Customer detail (only when occupied), from DS + Check in ──
   customerSTT: string | null; // STT gần nhất
@@ -80,7 +80,7 @@ export interface DeskLiveState {
   productName: string | null; // SP 1 (Check in, by name)
   paymentNote: string | null; // Note UDTT (Check in, by name)
   deviceAccepted: boolean | null; // Đã nghiệm thu thiết bị (Check in, by name)
-  /** Khách đang "Tiếp nhận" tại bàn (đã cắt tối đa theo DESK_CAPACITY). */
+  /** Mọi khách đang "Tiếp nhận" cùng lúc bởi NV phụ trách bàn này, sắp theo thời gian check-in. */
   receivedCustomers: DeskCustomer[];
 }
 
@@ -88,15 +88,20 @@ export interface DeskLiveState {
 export type DeskData = TablePosition & Partial<DeskLiveState>;
 
 /**
- * Derive the visual status from `Trạng thái hiện tại`:
- *   "Đang tư vấn" → occupied · "Rảnh" → available · else → idle (grey).
+ * Derive the visual status — chỉ 2 màu, không còn "chưa có dữ liệu" (grey):
+ * bàn không có khách (kể cả khi Lark báo "Chưa có dữ liệu", hoặc không khớp
+ * bàn nào) đều coi là "available" (xanh). `isOccupied` (khi có) là nguồn đáng
+ * tin cậy nhất — mapper tính nó có xét cả trường hợp nhiều khách/bàn (DS chỉ
+ * theo dõi 1 khách/bàn nên `Trạng thái hiện tại` có thể báo "Rảnh" sai ngay
+ * khi khách GẦN NHẤT xong, dù NV đó vẫn còn đang phục vụ khách khác). Khi gọi
+ * với object chưa có `isOccupied` (vd bên trong mapper, lúc đang tính toán),
+ * rơi về suy từ text `Trạng thái hiện tại` như cũ: "Đang tư vấn" → occupied.
  */
 export function deskUiStatus(d: Partial<DeskLiveState> | undefined): DeskUiStatus {
-  if (!d || !d.hasData) return 'idle';
-  const s = (d.currentStatus ?? '').toLowerCase();
+  if (d?.isOccupied) return 'occupied';
+  const s = (d?.currentStatus ?? '').toLowerCase();
   if (s.includes('đang')) return 'occupied'; // Đang tư vấn / Đang tiếp nhận
-  if (s.includes('rảnh')) return 'available';
-  return 'idle'; // "Chưa có dữ liệu" or empty
+  return 'available'; // Rảnh, Chưa có dữ liệu, hoặc không có bàn nào khớp
 }
 
 /** Aggregated counts for one cluster. */

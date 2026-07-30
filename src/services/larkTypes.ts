@@ -4,11 +4,18 @@
  * The list-records endpoint returns
  *   { code, msg, data: { items: LarkRecord[], has_more, page_token, total } }
  * Each record has a `record_id` and a `fields` object keyed by the column's
- * display name. Cell values vary by field type (string, number, boolean, or a
- * rich-text segment array) — the mapper coerces them.
+ * display name. Cell values vary by field type — string, number, boolean, an
+ * array of rich-text segments (formula/text fields, e.g. "Done in Flow" →
+ * `[{text: "Tư vấn", type: "text"}]`), an array of bare strings (link/lookup
+ * fields, e.g. "TV_Nsư Tư vấn" → `["optxXl70bv"]`, no `.text` wrapper), OR an
+ * array of person objects (a "person" link field, e.g. "NV Tư vấn" →
+ * `[{id, name, email, avatar_url}]`, no `.text`, use `.name`) — the mapper
+ * coerces all three shapes.
  */
 export interface LarkTextSegment {
-  text: string;
+  text?: string;
+  /** Person/link field (vd "Nhân viên") không có `.text` — dùng tên hiển thị này thay. */
+  name?: string;
   type?: string;
 }
 
@@ -18,7 +25,7 @@ export type LarkCellValue =
   | boolean
   | null
   | undefined
-  | LarkTextSegment[];
+  | Array<LarkTextSegment | string>;
 
 export interface LarkRecord {
   record_id: string;

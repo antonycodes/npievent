@@ -18,7 +18,6 @@ interface DeskPopoverProps {
 const STATUS_TEXT = {
   occupied: { label: 'Đang tiếp nhận', cls: 'bg-occupied' },
   available: { label: 'Trống', cls: 'bg-vacant' },
-  idle: { label: 'Chưa có dữ liệu', cls: 'bg-neutral-400' },
 } as const;
 
 function translateX(x: number): string {

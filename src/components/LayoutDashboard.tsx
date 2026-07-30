@@ -121,7 +121,7 @@ export default function LayoutDashboard({
   overlay,
 }: LayoutDashboardProps) {
   return (
-    <div className="relative aspect-video w-full">
+    <div className="relative aspect-video w-full [@media(max-aspect-ratio:8/5)]:aspect-[2360/1640]">
       {/* Board visuals clip to the rounded card; popovers stay outside this
           layer (below) so they're never cut off near the board's edges. */}
       <div className="absolute inset-0 overflow-hidden rounded-xl border border-neutral-300 bg-neutral-50 shadow-inner">

@@ -202,6 +202,13 @@ export const CHECKIN_LABELS: Record<keyof CheckinFieldMap, string> = {
   deviceAccepted: 'Check nghiệm thu (đã thu máy cũ)',
   doneInFlow: 'Done in Flow (khâu vừa hoàn tất)',
   endFlow: 'End flow (đã xong toàn bộ quy trình)',
+  time: 'Thời gian check-in (để sắp thứ tự)',
+  staffTradein: 'NV phụ trách — Thu cũ',
+  staffConsult: 'NV phụ trách — Tư vấn',
+  staffBackup: 'NV phụ trách — Backup',
+  statusTradein: 'Status in thu cũ',
+  statusConsult: 'Status in tư vấn',
+  statusBackup: 'Status in backup',
 };
 
 export const TX_FIELD_LABELS: Record<keyof TxFieldMap, string> = {

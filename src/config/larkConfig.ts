@@ -41,6 +41,16 @@ export interface CheckinFieldMap {
   doneInFlow: string;
   /** Đã xong toàn bộ quy trình chưa (formula) — giá trị "End flow" | "In flow". */
   endFlow: string;
+  /** Thời điểm check-in — dùng để sắp khách theo thứ tự trước/sau khi 1 NV phục vụ nhiều khách cùng lúc. */
+  time: string;
+  /** Khoá nhân viên phụ trách khách này ở từng cụm (giá trị nội bộ Lark, không cần là tên NV). */
+  staffTradein: string;
+  staffConsult: string;
+  staffBackup: string;
+  /** Trạng thái khách ở từng cụm — "Tiếp nhận" nghĩa là đang được NV đó phục vụ. */
+  statusTradein: string;
+  statusConsult: string;
+  statusBackup: string;
 }
 
 /** Transaction table columns (danh sách khách tiếp nhận theo bàn). */
@@ -80,6 +90,13 @@ export const DEFAULT_CHECKIN_FIELDS: CheckinFieldMap = {
   deviceAccepted: 'Check nghiệm thu',
   doneInFlow: 'Done in Flow',
   endFlow: 'End flow',
+  time: 'Thời gian',
+  staffTradein: 'TC_Nsư thu cũ',
+  staffConsult: 'TV_Nsư Tư vấn',
+  staffBackup: 'BC_Nhân sự',
+  statusTradein: 'Status in thu cũ',
+  statusConsult: 'Status in tư vấn',
+  statusBackup: 'Status in backup',
 };
 
 export const DEFAULT_TX_CONSULT_FIELDS: TxFieldMap = {
@@ -96,8 +113,8 @@ export const STATUS_RECEIVED = 'Tiếp nhận';
 export const STATUS_COMPLETED = 'Hoàn tất';
 
 /**
- * `Trạng thái hiện tại` → desk UI status.
- *   "Đang tư vấn" → occupied · "Rảnh" → available · else → idle.
+ * `Trạng thái hiện tại` → desk UI status — chỉ 2 màu:
+ *   "Đang tư vấn" → occupied (đỏ) · else (kể cả "Rảnh"/"Chưa có dữ liệu") → available (xanh).
  */
 export const STATUS_OCCUPIED_HINT = 'đang';
 export const STATUS_FREE_HINT = 'rảnh';

@@ -740,4 +740,219 @@ flex-1 vẫn lấp đầy đúng, chỉ là ảo giác do ảnh thu nhỏ).
   ~57px ở board 442px cao) đã khá sít; tăng size chấm có thể gây đè lên bàn
   hàng dưới, cần tính lại toạ độ `layoutConfig.ts` cẩn thận chứ không chỉ đổi
   class — để user quyết định có muốn làm tiếp không.
-  đúng hoàn toàn qua screenshot.
+
+### 1 NV phục vụ nhiều khách cùng lúc — mở rộng ra CẢ 3 cụm (2026-07-30)
+User hỏi "1 NV tiếp nhận 2 khách thì hiện thế nào" — trả lời: chỉ Tư vấn có hỗ
+trợ (qua bảng "Giao dịch Tư vấn", `DESK_CAPACITY.consult=2`); Thu cũ/Backup
+CHƯA hỗ trợ (`DESK_CAPACITY=1`, chỉ đọc "Khách gần nhất" — 1 giá trị). User
+yêu cầu mở rộng ra cả 3 cụm, hiển thị ĐÚNG mọi khách 1 NV đang phục vụ (không
+chỉ "khách gần nhất"), sắp theo thời gian trước/sau.
+
+- **Verify trước khi code** (fetch trực tiếp qua proxy, không đoán): bảng
+  Check-in có sẵn field theo TỪNG KHÁCH cho cả 3 cụm — `TC_Nsư thu cũ` /
+  `TV_Nsư Tư vấn` / `BC_Nhân sự` (khoá NV phụ trách, giá trị nội bộ Lark) +
+  `Status in thu cũ` / `Status in tư vấn` / `Status in backup` (= "Tiếp nhận"
+  khi đang được NV đó phục vụ, "Chưa tiếp nhận" khi chưa) + `Thời gian` (mốc
+  check-in, ms epoch). Bắt được bằng chứng thật: "Nguyễn Minh Long" và "Huỳnh
+  Ngọc Linh" cùng `TV_Nsư Tư vấn = "optxXl70bv"` và cùng `Status in tư vấn =
+  "Tiếp nhận"` tại cùng 1 thời điểm — xác nhận đúng cơ chế cần dùng, và
+  KHÔNG cần bảng/route proxy mới (khác với "Điều phối" trước đây) vì dữ liệu
+  đã nằm sẵn trong Check-in.
+- **Kiến trúc mới** (`larkMapper.ts`): bỏ hẳn cơ chế cũ dựa vào bảng riêng
+  "Giao dịch Tư vấn" (`indexReceived`/`receivedByDesk`, vốn chỉ áp dụng cho
+  Tư vấn và hiện đang **0 dòng** trong dữ liệu thật — coi như đã ngưng dùng).
+  Thay bằng `indexActiveByStaffKey()`: với mỗi cụm, gom mọi khách Check-in
+  đang "Tiếp nhận" theo khoá NV (`TC_Nsư thu cũ`/`TV_Nsư Tư vấn`/`BC_Nhân
+  sự`), sắp theo `Thời gian` tăng dần. Trong vòng lặp DS chính: lấy khách
+  "gần nhất" làm ANCHOR (chỉ để suy ra khoá NV của BÀN này, không giới hạn số
+  lượng), tra khoá NV của anchor → lấy đúng nhóm khách đang được NV đó phục
+  vụ → `receivedCustomers`. Fallback về danh sách 1-khách (anchor) khi
+  Check-in chưa có khoá NV (dữ liệu cũ/thiếu) — không mất thông tin.
+  `activeNames` giờ nhận từ `receivedCustomers` ở CẢ 3 cụm (trước chỉ Tư
+  vấn) — nên khách nhóm 2 tự động không bị tính nhầm "Chờ check-in".
+- `types/desk.ts`: `DESK_CAPACITY` nâng `tradein`/`backup` từ 1 lên 2 (khớp
+  `consult`) — không còn giới hạn cứng, list không bị cắt, số này giờ chỉ
+  còn ý nghĩa hiển thị mẫu số "(x/2)" ở `DeskPopover`.
+- `larkConfig.ts`/`larkSettings.ts`: `CheckinFieldMap` thêm 7 field phẳng
+  (`time`, `staffTradein/Consult/Backup`, `statusTradein/Consult/Backup`) —
+  giữ dạng phẳng (không nest theo cụm) để `SettingsPage.tsx` tự động hiện
+  form mapping mà KHÔNG cần sửa gì ở đó (đã lặp sẵn qua
+  `Object.keys(CHECKIN_LABELS)`).
+- **`DeskPopover.tsx`/`LayoutDashboard.tsx`: KHÔNG cần sửa gì** — cả 2 đã
+  viết generic theo `receivedCustomers.length` từ trước (nhánh 1-khách vs
+  nhánh danh sách), chỉ do tầng dữ liệu giới hạn Thu cũ/Backup còn 1 khách.
+  Xác nhận lại nguyên tắc: khi thêm khả năng mới, luôn kiểm tra tầng UI có
+  sẵn generic chưa trước khi sửa thêm.
+- Không xoá hạ tầng `TxFieldMap`/`txConsult` (config/settings/type/worker
+  route) — để dormant, không dùng trong mapper nữa nhưng không ảnh hưởng gì
+  nếu còn đó (theo đúng cách đã làm với `sttRecent` trước đây).
+- Mock data: thêm 3 khách mới (ci_9 "Hoàng Anh Tú", ci_10 "Bùi Thanh Hà",
+  ci_11 "Đặng Gia Hân") làm "bạn đồng hành" cho TC1/TV2/BK1 — mỗi cặp cùng
+  khoá NV + status "Tiếp nhận", thời gian check-in SAU anchor (để test đúng
+  thứ tự sắp xếp). Thêm field `Thời gian` (ms) cho tất cả 11 khách.
+- **Verify**: gọi thẳng `mapDeskStates` qua mock — TC1/TV2/BK1 đều trả đúng 2
+  khách theo đúng thứ tự (anchor trước, bạn đồng hành sau, đúng theo
+  `Thời gian`); TC3/TV4 (không có dữ liệu nhóm) vẫn đúng 1 khách qua fallback
+  — không có hồi quy. UI: chấm STT hiện đúng hàng ngang 2 chấm ở cả TC1/BK1
+  (trước đây 2 cụm này KHÔNG BAO GIỜ hiện được 2 chấm); popover "Bàn TC1"
+  hiện "Khách đang tiếp nhận (2/2)" — Nguyễn Minh Long (đỏ, đã nghiệm thu)
+  trước, Hoàng Anh Tú sau — đúng thứ tự thời gian. `tsc --noEmit` sạch.
+
+### Bug thật: `cellToString` không đọc được field dạng mảng string trần / mảng người dùng (2026-07-30)
+User báo: Lark thật TV1 đang có 2 khách (STT 1, 2) cùng lúc nhưng code chỉ
+hiện 1 (STT 2). User khẳng định `TV_Nsư Tư vấn`/`TC_Nsư thu cũ`/`BC_Nhân sự`
+"chắc chắn ổn định" — tức lỗi phải ở phía code, không phải dữ liệu thiếu.
+
+- Đã nghi ngờ sai ban đầu (trả lời trước): tưởng do dữ liệu Lark tự xoá field
+  (volatile). User khẳng định ổn định → quay lại verify KỸ hơn thay vì tin
+  vào suy đoán "dữ liệu không ổn định".
+- **Root cause thật** (dump raw JSON, không qua `cellToString`): giá trị thật
+  của `TV_Nsư Tư vấn` là `["optxXl70bv"]` — **mảng chứa 1 string trần**,
+  KHÁC với dạng rich-text segment `[{text, type}]` mà các field formula khác
+  (Done in Flow, End flow, Check nghiệm thu) trả về. `cellToString()` cũ chỉ
+  xử lý `seg?.text` — với `seg` là string nguyên thủy, `.text` là `undefined`
+  → luôn ra `''` → hàm trả `null` dù field CÓ giá trị. Đây là lý do
+  `staffKey` luôn `null`, khiến cơ chế gom nhóm (tính năng trước) không bao
+  giờ hoạt động được với dữ liệu thật, dù mock test đều pass (mock dùng
+  string trực tiếp, không phải mảng, nên không lộ bug này).
+- **Fix `larkMapper.ts::cellToString`**: khi gặp mảng, xử lý CẢ 3 dạng phần
+  tử đã xác nhận từ Lark thật: string trần (`"optxXl70bv"`), rich-text
+  segment (`{text, type}`), và person-link object (`{id, name, email,
+  avatar_url}` — vd field "Nhân viên"/"NV Tư vấn" ở bảng DS). `LarkTextSegment`
+  (`larkTypes.ts`) nới thành `{text?, name?, type?}` (mọi field đều optional)
+  để type-safe cho cả 3 dạng.
+- **Bonus tìm thấy cùng lúc** (cùng root cause, cùng file): "Tên NV" trong
+  popover bàn luôn trống với dữ liệu thật — vì `Nhân viên`/`NV Tư vấn` là
+  person-link field (`{name}`, không có `.text`), giờ đã đọc đúng nhờ cùng 1
+  fix.
+- **Bài học**: khi mock data dùng kiểu dữ liệu ĐƠN GIẢN HƠN thật (string thay
+  vì mảng), test qua mock KHÔNG bắt được lỗi parse — chỉ verify bằng
+  `fetch()` trực tiếp + dump RAW JSON (không qua hàm parse của mình) mới lộ
+  ra được. Cần cẩn thận hơn: khi 1 field mới báo "luôn null", nghi ngờ hàm
+  parse trước khi kết luận "dữ liệu thiếu".
+- **Verify lại bằng dữ liệu live thật**: `TV1.receivedCustomers` giờ đúng
+  `[Nguyễn Minh Long (STT 1), Huỳnh Ngọc Linh (STT 2)]` (đúng thứ tự thời
+  gian); `TV1.staffName = "Dương Đình Hưng"` (trước đó rỗng). Test lại mock
+  (TC1/TV2/BK1 + waitingCheckin/endFlow) — không hồi quy. `tsc --noEmit` sạch.
+
+### Bug thật #2 (cùng ngày): desk "Rảnh" sai + mất người vừa hoàn tất khi bàn còn người khác (2026-07-30)
+User test tiếp: TV1 có 3 khách (STT 1,2,3) cùng lúc; khách 1 hoàn tất thì
+**cả bàn chuyển Rảnh luôn**, dù khách 2,3 vẫn "Tiếp nhận". Verify live xác
+nhận: `Status in tư vấn` có state thứ 3 `"Hoàn tất"` (không chỉ Tiếp
+nhận/Chưa tiếp nhận); DS `Trạng thái hiện tại` = "Rảnh" (chỉ theo khách GẦN
+NHẤT là khách 1) dù khách 2,3 vẫn active — cùng gốc rễ với bug hôm trước
+(DS chỉ theo dõi 1 khách/bàn) nhưng lộ ra ở 2 chỗ MỚI chưa fix lần trước:
+
+1. **Màu bàn (occupied/available) sai**: `deskUiStatus()` (`types/desk.ts`)
+   chỉ đọc text `currentStatus` — không biết gì về nhóm nhiều khách nội bộ
+   mapper vừa tính. Fix: check `d.isOccupied` (bool mapper tính, đã tính đúng
+   multi-customer) TRƯỚC, chỉ fallback về suy text khi không có (vd lúc mapper
+   tự gọi nội bộ với object chưa gán isOccupied — dùng để tính `dsOccupied`
+   làm 1 trong 2 tín hiệu OR). `currentStatus` (text thô) GIỮ NGUYÊN không sửa
+   — vẫn cần hiển thị trung thực trong `DeskPopover` dòng "Trạng thái".
+2. **"Chờ điều phối" bỏ sót người vừa xong**: cơ chế cũ đẩy candidate vào
+   `completedCandidates` dựa theo DS CẤP BÀN (`!occupied && statusRecent ===
+   'Hoàn tất'`) — nay `occupied` đúng ra vẫn `true` (còn khách 2,3), nên nhánh
+   này không bao giờ chạy, khách 1 KHÔNG BAO GIỜ vào "Chờ điều phối" nữa. Fix
+   tận gốc: bỏ hẳn cách cũ, thay bằng quét TỪNG KHÁCH qua Check-in
+   (`Status in <cụm> === "Hoàn tất"`, lặp cả 3 cụm, không liên quan gì đến
+   trạng thái của BÀN) — đúng bản chất "hoàn tất" là sự kiện của 1 NGƯỜI,
+   không phải của 1 BÀN.
+3. **Bug phát sinh khi fix #2, tự bắt được khi verify**: sau khi sửa #1+#2,
+   khách 1 (Nguyễn Minh Long) vẫn KHÔNG hiện ở "Chờ điều phối" — do
+   `activeNames.add(customerName)` vẫn gán `customerName = customerRecent`
+   (= khách 1, anchor CŨ) một cách VÔ ĐIỀU KIỆN mỗi khi `occupied` true, bất
+   kể anchor có còn trong nhóm active hay không — nên khách 1 bị tính nhầm
+   "đang active" (qua TV1) dù đã hoàn tất, và bị loại khỏi waitingDispatch bởi
+   chính điều kiện `activeNames.has(cand.name)`. Fix: các field "1 khách"
+   (`customerSTT`/`customerName`/`productName`/`paymentNote`/`deviceAccepted`
+   trên `DeskLiveState`, dùng cho fallback + hiển thị rút gọn) đổi sang lấy từ
+   khách ĐẦU TIÊN trong `receivedCustomers` THẬT SỰ (list đã gom đúng), không
+   phải luôn là anchor — `activeNames` giờ CHỈ được set từ
+   `receivedCustomers` (nguồn duy nhất, không có đường phụ nào set thêm).
+   **Bài học**: khi có nhiều nguồn cùng ghi vào 1 tập hợp dùng cho loại trừ
+   (`activeNames`), phải đảm bảo TẤT CẢ nguồn cùng nhất quán với "sự thật"
+   mới nhất — 1 đường quên cập nhật là đủ để tạo bug âm thầm.
+- Cập nhật `fallback` trong bàn: chỉ dùng khi `!hasActiveGroup` (không có
+  fallback đè lên nhóm thật).
+- Mock: thêm `Status in thu cũ: 'Hoàn tất'` cho Vũ Xuân Phong (ci_6) — cơ chế
+  cũ (DS-driven) bị xoá hoàn toàn nên ví dụ `waitingDispatch` cũ (dựa vào DS)
+  không còn tự chạy được nữa, phải thêm tín hiệu Check-in tương ứng.
+- **Verify live**: `TV1.isOccupied=true`, `deskUiStatus(TV1)="occupied"` (đỏ),
+  `receivedCustomers=[Huỳnh Ngọc Linh, Phạm Đức Dũng]` (đúng, loại khách 1),
+  `waitingDispatch=[{name:'Nguyễn Minh Long', fromCluster:'consult',
+  doneInFlow:'Tư vấn'}]` (đúng!). UI: TV1 hiện đỏ với 2 chấm STT (2,3); "Chờ
+  điều phối" hiện đúng 1 chấm; popover Nguyễn Minh Long hiện đúng
+  `Trạng thái: Đã hoàn tất "Khâu Tư vấn"`. Test lại mock (TC1/TV2/BK1 + lại
+  đúng waitingDispatch cho Vũ Xuân Phong) — không hồi quy. `tsc --noEmit` sạch.
+
+### Bỏ trạng thái "idle" (chưa có dữ liệu) — chỉ còn xanh/đỏ (2026-07-30)
+User: bỏ hẳn ô xám "chưa có dữ liệu", board chỉ còn 2 màu — xanh (rảnh) / đỏ
+(có khách). Coi "chưa có dữ liệu" (hoặc không khớp bàn nào) cũng là "rảnh".
+
+- `types/desk.ts`: `DeskUiStatus` bỏ `'idle'` (còn `'available' | 'occupied'`).
+  `deskUiStatus()` viết lại: `isOccupied` true → occupied; text chứa "đang" →
+  occupied (dùng khi gọi nội bộ mapper, object chưa có `isOccupied`); MỌI
+  trường hợp còn lại (Rảnh, Chưa có dữ liệu, không có `d`/`hasData`) → luôn
+  `available`. `computeSummary()` không cần sửa — vòng lặp `if/else if`
+  occupied/available đã exhaustive sẵn, giờ mọi bàn rơi đúng 1 trong 2 nhánh.
+  `hasData`/`withData` GIỮ NGUYÊN (khác khái niệm — vẫn dùng cho tỉ lệ "X/Y
+  bàn có dữ liệu" ở Sidebar, không phải màu ô).
+- `components/Desk.tsx`: bỏ `idle` khỏi `TONE` map.
+- `components/DeskPopover.tsx`: bỏ `idle` khỏi `STATUS_TEXT` — nhánh nội dung
+  (available vs occupied) đã dùng chung message "Bàn trống — chưa có thông
+  tin khách." từ trước, không cần sửa gì thêm ở đó. **Cố tình giữ nguyên**
+  dòng "Trạng thái" (hiện `desk.currentStatus` thô, có thể vẫn là "Chưa có dữ
+  liệu") — đây là hiển thị TRUNG THỰC dữ liệu Lark gốc để debug, khác với cái
+  BADGE góc trên (nay luôn chỉ "Trống"/"Đang tiếp nhận") đã đơn giản hoá theo
+  yêu cầu. Không fake dữ liệu thô.
+- `components/StatusLegend.tsx`: xoá mục chú thích "Chưa có dữ liệu" (chấm
+  xám).
+- `larkConfig.ts`: sửa lại doc-comment mô tả logic (chỉ comment, không đổi
+  hằng số `STATUS_OCCUPIED_HINT`/`STATUS_FREE_HINT` — 2 hằng này vốn đã
+  không được import/dùng ở đâu từ trước, không phải do đợt sửa này).
+- **Verify**: `tsc --noEmit` sạch (không có nơi nào khác so khớp literal
+  `'idle'` nên không phát sinh lỗi type). UI live: mọi bàn giờ đúng 2 màu (TC,
+  BK, phần lớn TV đều xanh dù Lark báo "Chưa có dữ liệu"); popover bàn trống
+  hiện badge "Trống" xanh (trước là "Chưa có dữ liệu" xám) nhưng dòng "Trạng
+  thái" vẫn trung thực "Chưa có dữ liệu"; filter "Chỉ hiện bàn trống" vẫn
+  đúng (chỉ làm mờ bàn đang occupied). Test lại mock — không hồi quy.
+
+### 2 tỉ lệ board CỐ ĐỊNH — desktop 1920×1080 (16:9), iPad 2360×1640 (2026-07-30)
+User: Thu cũ trên iPad quá sát nhau, khó bấm. Fix cứng 2 tỉ lệ (không cần
+adaptive mượt theo mọi kích thước) vì app luôn chạy full màn hình đúng 1
+trong 2 kích thước này.
+
+- **Không tạo 2 bộ toạ độ riêng cho layoutConfig.ts** — thay vào đó chỉ đổi
+  **tỉ lệ khung board** (`aspect-video` 16:9 → `aspect-[2360/1640]` ≈1.44:1
+  khi ở "hình iPad"). Vì mọi toạ độ desk đều là %, board CAO hơn (ứng với
+  cùng 1 chiều rộng) tự động cho MỌI hàng (không riêng Thu cũ) nhiều khoảng
+  cách pixel hơn — đo được tăng từ 71px lên 113px giữa tâm TC1↔TC3 (~+59%),
+  đủ để không cần sửa `layoutConfig.ts` (giữ 1 bộ toạ độ, ít rủi ro hồi quy
+  hơn 2 bộ toạ độ song song).
+- **Cách chọn profile — dùng media feature `aspect-ratio`, KHÔNG dùng
+  `min-width`**: `LayoutDashboard.tsx` — class Tailwind arbitrary variant
+  `[@media(max-aspect-ratio:8/5)]:aspect-[2360/1640]` (mặc định vẫn
+  `aspect-video`). Lý do quan trọng: 2360×1640 nhiều khả năng là độ phân giải
+  NATIVE/marketing của iPad (Retina @2x) — trình duyệt thật trên iPad
+  (`window.innerWidth`) nhiều khả năng sẽ báo **1180×820** (bằng nửa), không
+  phải 2360×1640. Nếu chọn profile theo `min-width` cố định 2360px thì SẼ
+  KHÔNG BAO GIỜ kích hoạt trên iPad thật. Dùng `aspect-ratio` thay vì `width`
+  né được hoàn toàn vấn đề này — vì tỉ lệ khung hình GIỐNG HỆT nhau dù đo
+  bằng native hay logical pixel (chỉ là nhân đôi cả 2 chiều). Ngưỡng chọn
+  `8/5` (=1.6) nằm giữa 16:9 (1.778) và tỉ lệ iPad (1.439) — an toàn cho cả 2
+  profile chính xác.
+- **Đã báo cho user (chưa tự sửa)**: nếu app chạy trong Safari/WebView thật
+  trên iPad (không phải màn ngoài rời qua USB-C), viewport thật nhiều khả
+  năng KHÔNG PHẢI 2360×1640 — cần user xác nhận lại bằng cách mở DevTools/
+  Safari Web Inspector trên đúng thiết bị và đọc `window.innerWidth/innerHeight`
+  thật, vì cách chọn theo `aspect-ratio` đã né được vấn đề NHƯNG nếu user
+  từng test qua `resize_window` ở đúng "2360×1640" logic (không phải iPad
+  thật), kết quả nhìn đúng như mong đợi dù device thật có thể khác.
+- **Verify chính xác từng profile** (đo `getBoundingClientRect`/
+  `getComputedStyle`, không đoán qua ảnh):
+  - 2360×1640 → `aspectRatio: "2360 / 1640"`, board 2032×1412px, TC1↔TC3
+    center-to-center = 113px (gap cạnh-cạnh 77px, rộng rãi so với nút 36px).
+  - 1920×1080 → `aspectRatio: "16 / 9"` (không đổi), board 1592×896px,
+    TC1↔TC3 = 71px (giữ nguyên như trước, không ảnh hưởng desktop).
+  `tsc --noEmit` sạch. Không sửa gì thêm ở `layoutConfig.ts`/`Desk.tsx`.

@@ -3,7 +3,7 @@
  *
  * Props follow the spec: `id`, `type`, `status`, `staffName`, `customerSTT`
  * (+ `waiting` bottleneck count and selection/click handlers). Color:
- *   occupied → red, available → green, idle (no data) → grey.
+ *   occupied → red, available → green (kể cả khi Lark chưa có dữ liệu).
  */
 import type { ClusterKey, DeskUiStatus } from '@/types/desk';
 
@@ -25,7 +25,6 @@ export interface DeskProps {
 }
 
 const TONE: Record<DeskUiStatus, string> = {
-  idle: 'bg-neutral-200 border-neutral-400 text-neutral-600',
   available: 'bg-vacant border-green-700 text-white',
   occupied: 'bg-occupied border-red-800 text-white',
 };
