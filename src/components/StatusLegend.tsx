@@ -3,7 +3,7 @@
  */
 export default function StatusLegend() {
   return (
-    <div className="flex flex-wrap items-center gap-4 text-sm">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs md:text-sm">
       <span className="flex items-center gap-2">
         <span className="inline-block h-4 w-4 rounded-full bg-vacant" />
         Trống (Available)

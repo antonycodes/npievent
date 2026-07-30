@@ -59,7 +59,8 @@ function Chip({
       onClick={onClick}
       aria-pressed={active}
       className={[
-        'rounded-full border px-3 py-1 text-xs font-medium transition',
+        // min-h-8 keeps the chips comfortably tappable on a tablet.
+        'flex min-h-8 items-center rounded-full border px-3 text-xs font-medium transition',
         active
           ? 'border-brand bg-brand text-white shadow-sm'
           : 'border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50',

@@ -56,9 +56,20 @@ export default function DeskPopover({ desk, onClose }: DeskPopoverProps) {
             </div>
             <div className="text-sm font-bold text-neutral-800">Bàn {id}</div>
           </div>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${st.cls}`}>
-            {st.label}
-          </span>
+          {/* Trạng thái + nút đóng nằm cùng hàng để không đè lên nhau. */}
+          <div className="flex shrink-0 items-center gap-1">
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${st.cls}`}>
+              {st.label}
+            </span>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Đóng"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-lg leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <dl className="space-y-1.5 text-sm">
@@ -109,14 +120,6 @@ export default function DeskPopover({ desk, onClose }: DeskPopoverProps) {
           )}
         </dl>
 
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Đóng"
-          className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
-        >
-          ×
-        </button>
       </div>
     </div>
   );

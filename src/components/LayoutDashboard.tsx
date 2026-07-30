@@ -42,13 +42,23 @@ interface LayoutDashboardProps {
   overlay?: React.ReactNode;
 }
 
+/**
+ * Số chấm STT hiển thị tối đa dưới 1 node — phần dư gộp thành "+n".
+ * Bằng DESK_CAPACITY (2 khách/NV) nên bình thường không bao giờ bị gộp; giới hạn
+ * này giữ cho hàng chấm luôn hẹp hơn khoảng cách giữa 2 bàn cạnh nhau, kể cả khi
+ * dữ liệu Lark trả về nhiều khách bất thường trên cùng 1 bàn.
+ */
+const MAX_DESK_DOTS = 2;
+
 function Region({ label, sub, className }: { label: string; sub?: string; className: string }) {
   return (
     <div
-      className={`absolute flex flex-col items-center justify-center rounded-lg border border-dashed text-center ${className}`}
+      className={`absolute flex flex-col items-center justify-center rounded-lg border border-dashed px-1 text-center ${className}`}
     >
-      <span className="text-[11px] font-semibold uppercase tracking-wide">{label}</span>
-      {sub && <span className="text-[9px] opacity-70">{sub}</span>}
+      <span className="text-[length:var(--label-fs)] font-semibold uppercase leading-tight tracking-wide">
+        {label}
+      </span>
+      {sub && <span className="text-[length:var(--label-sm-fs)] opacity-70">{sub}</span>}
     </div>
   );
 }
@@ -56,7 +66,7 @@ function Region({ label, sub, className }: { label: string; sub?: string; classN
 function ClusterCaption({ text, className }: { text: string; className: string }) {
   return (
     <span
-      className={`absolute -translate-x-1/2 text-[11px] font-bold uppercase tracking-wide text-neutral-500 ${className}`}
+      className={`absolute -translate-x-1/2 text-[length:var(--label-fs)] font-bold uppercase leading-none tracking-wide text-neutral-500 ${className}`}
     >
       {text}
     </span>
@@ -79,12 +89,22 @@ function WaitingZone({
 }) {
   return (
     <div
-      className={`absolute flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-amber-300 bg-amber-50/60 px-2 py-2 text-center ${className}`}
+      className={`absolute flex flex-col rounded-lg border border-dashed border-amber-300 bg-amber-50/60 p-[1.5%] text-center ${className}`}
     >
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">{label}</span>
-      <div className="flex max-h-[calc(100%-16px)] flex-wrap items-center justify-center gap-1 overflow-hidden">
+      <div className="flex shrink-0 items-center justify-center gap-1 text-[length:var(--label-fs)] font-semibold uppercase leading-tight tracking-wide text-amber-700">
+        <span>{label}</span>
+        {items.length > 0 && (
+          <span className="rounded-full bg-amber-200/80 px-1 leading-tight text-amber-800">
+            {items.length}
+          </span>
+        )}
+      </div>
+      {/* Cuộn thay vì cắt cụt khi khu vực chờ đông khách. */}
+      <div className="mt-[3%] flex min-h-0 flex-1 flex-wrap content-start items-start justify-center gap-[var(--dot-gap)] overflow-y-auto">
         {items.length === 0 ? (
-          <span className="text-[10px] italic text-neutral-400">Không có khách</span>
+          <span className="text-[length:var(--label-sm-fs)] italic text-neutral-400">
+            Không có khách
+          </span>
         ) : (
           items.map((item, i) => (
             <button
@@ -93,9 +113,10 @@ function WaitingZone({
               title={`${item.stt ? `#${item.stt} · ` : ''}${item.name ?? ''}`}
               onClick={() => onSelect?.(i)}
               className={[
-                'flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1',
-                'text-[10px] font-bold text-white shadow ring-1 ring-white transition hover:scale-110',
-                selectedIndex === i ? 'z-30 ring-2 ring-blue-500 ring-offset-1 scale-110' : '',
+                'flex h-[var(--zone-dot)] min-w-[var(--zone-dot)] shrink-0 items-center justify-center',
+                'rounded-full bg-amber-500 px-[3px] text-[length:var(--zone-dot-fs)] font-bold leading-none',
+                'text-white shadow ring-1 ring-white transition hover:scale-110',
+                selectedIndex === i ? 'z-30 scale-110 ring-2 ring-blue-500 ring-offset-1' : '',
               ].join(' ')}
             >
               {item.stt ?? '•'}
@@ -121,7 +142,7 @@ export default function LayoutDashboard({
   overlay,
 }: LayoutDashboardProps) {
   return (
-    <div className="relative aspect-video w-full [@media(max-aspect-ratio:8/5)]:aspect-[2360/1640]">
+    <div className="board relative aspect-video w-full [@media(max-aspect-ratio:8/5)]:aspect-[2360/1640]">
       {/* Board visuals clip to the rounded card; popovers stay outside this
           layer (below) so they're never cut off near the board's edges. */}
       <div className="absolute inset-0 overflow-hidden rounded-xl border border-neutral-300 bg-neutral-50 shadow-inner">
@@ -146,9 +167,9 @@ export default function LayoutDashboard({
         />
         <Region label="Cổng" className="left-[42%] top-[88%] h-[8%] w-[16%] border-neutral-300 text-neutral-500" />
 
-        {/* ── Cluster captions ──────────────────────────────────────── */}
-        <ClusterCaption text="Thu cũ" className="left-[13%] top-[29%]" />
-        <ClusterCaption text="Tư vấn" className="left-[55%] top-[43%]" />
+        {/* ── Cluster captions (căn giữa theo grid mới của từng cụm) ── */}
+        <ClusterCaption text="Thu cũ" className="left-[13.5%] top-[28.5%]" />
+        <ClusterCaption text="Tư vấn" className="left-[53.5%] top-[43.5%]" />
 
         {/* ── Interactive desks (38) ────────────────────────────────── */}
         {desks.map((d) => (
@@ -168,48 +189,50 @@ export default function LayoutDashboard({
           />
         ))}
 
-        {/* ── Chấm STT khách đã tiếp nhận (mọi cụm) — bấm để xem khách ── */}
+        {/* ── Chấm STT khách đã tiếp nhận (mọi cụm) — bấm để xem khách ──
+            Luôn là 1 hàng chấm NGAY DƯỚI node (không còn badge đè lên node), đặt
+            cách node đúng `--dot-offset` nên không bao giờ chồng lên nhãn bàn
+            hay lên hàng bàn phía dưới. */}
         {desks.map((d) => {
           const list = d.receivedCustomers ?? [];
           if (list.length === 0) return null;
           const dim = dimmedIds?.has(d.id) ? 'pointer-events-none opacity-15' : '';
+          const shown = list.slice(0, MAX_DESK_DOTS);
+          const overflow = list.length - shown.length;
 
-          const Dot = (c: (typeof list)[number], i: number) => {
-            const active = selectedCustomer?.deskId === d.id && selectedCustomer?.index === i;
-            return (
-              <button
-                key={i}
-                type="button"
-                title={`${c.stt ? `#${c.stt} · ` : ''}${c.name ?? ''}`}
-                onClick={() => onSelectCustomer?.(d.id, i)}
-                className={[
-                  'flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1',
-                  'text-[9px] font-bold text-white shadow ring-1 ring-white transition hover:scale-125',
-                  active ? 'z-30 ring-2 ring-blue-500 ring-offset-1 scale-125' : '',
-                ].join(' ')}
-              >
-                {c.stt ?? '•'}
-              </button>
-            );
-          };
-
-          // 1 khách → badge ở góc phải-dưới node (tránh đè bàn hàng dưới).
-          // ≥2 khách → hàng chấm ngay dưới node.
-          return list.length === 1 ? (
+          return (
             <div
               key={`dots-${d.id}`}
-              className={`absolute z-20 ${dim}`}
-              style={{ left: `${d.x}%`, top: `${d.y}%`, transform: 'translate(4px, 6px)' }}
+              className={`absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-[var(--dot-gap)] ${dim}`}
+              style={{ left: `${d.x}%`, top: `calc(${d.y}% + var(--dot-offset))` }}
             >
-              {Dot(list[0], 0)}
-            </div>
-          ) : (
-            <div
-              key={`dots-${d.id}`}
-              className={`absolute z-20 flex -translate-x-1/2 gap-1 ${dim}`}
-              style={{ left: `${d.x}%`, top: `calc(${d.y}% + 22px)` }}
-            >
-              {list.map(Dot)}
+              {shown.map((c, i) => {
+                const active = selectedCustomer?.deskId === d.id && selectedCustomer?.index === i;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    title={`${c.stt ? `#${c.stt} · ` : ''}${c.name ?? ''}`}
+                    onClick={() => onSelectCustomer?.(d.id, i)}
+                    className={[
+                      'flex h-[var(--dot)] min-w-[var(--dot)] shrink-0 items-center justify-center',
+                      'rounded-full bg-amber-500 px-[2px] text-[length:var(--dot-fs)] font-bold leading-none',
+                      'text-white shadow ring-1 ring-white transition hover:scale-125',
+                      active ? 'z-30 scale-125 ring-2 ring-blue-500 ring-offset-1' : '',
+                    ].join(' ')}
+                  >
+                    {c.stt ?? '•'}
+                  </button>
+                );
+              })}
+              {overflow > 0 && (
+                <span
+                  title={`Thêm ${overflow} khách — bấm vào bàn để xem đầy đủ`}
+                  className="flex h-[var(--dot)] items-center justify-center rounded-full bg-amber-700 px-[3px] text-[length:var(--dot-fs)] font-bold leading-none text-white shadow ring-1 ring-white"
+                >
+                  +{overflow}
+                </span>
+              )}
             </div>
           );
         })}
