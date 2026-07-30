@@ -100,8 +100,8 @@ interface CheckinIndexEntry {
   product: string | null;
   note: string | null;
   deviceAccepted: boolean;
-  /** Nội dung cột "Check thu cũ" — chi tiết máy cũ thu vào. */
-  oldDeviceNote: string | null;
+  /** Cột "Thu cũ check" — nguyên văn lựa chọn (single-select, có thể ≥ 2 tuỳ chọn). */
+  oldDeviceCheck: string | null;
   /** Khâu vừa hoàn tất (Check-in cột "Done in Flow") — chỉ có ý nghĩa khi khách đã xong 1 khâu. */
   doneInFlow: string | null;
   /** Đã hoàn tất toàn bộ quy trình (Check-in cột "End flow"). */
@@ -128,7 +128,7 @@ function indexCheckinByName(rows: LarkRecord[], fm: CheckinFieldMap): Map<string
         product: cellToString(r.fields[fm.product]),
         note: cellToString(r.fields[fm.note]),
         deviceAccepted: cellToBool(r.fields[fm.deviceAccepted]),
-        oldDeviceNote: cellToString(r.fields[fm.oldDeviceNote]),
+        oldDeviceCheck: cellToString(r.fields[fm.oldDeviceCheck]),
         doneInFlow: cellToString(r.fields[fm.doneInFlow]),
         endFlow: isEndFlowValue(r.fields[fm.endFlow]),
         staffKey: {
@@ -189,7 +189,7 @@ function indexActiveByStaffKey(
           productName: ci?.product ?? null,
           paymentNote: ci?.note ?? null,
           deviceAccepted: ci?.deviceAccepted ?? null,
-          oldDeviceNote: ci?.oldDeviceNote ?? null,
+          oldDeviceCheck: ci?.oldDeviceCheck ?? null,
         },
       });
     }
@@ -260,7 +260,7 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
                 productName: anchorCi?.product ?? null,
                 paymentNote: anchorCi?.note ?? null,
                 deviceAccepted: anchorCi?.deviceAccepted ?? null,
-                oldDeviceNote: anchorCi?.oldDeviceNote ?? null,
+                oldDeviceCheck: anchorCi?.oldDeviceCheck ?? null,
               },
             ]
           : [];
@@ -316,7 +316,7 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
         productName: ci?.product ?? null,
         paymentNote: ci?.note ?? null,
         deviceAccepted: ci?.deviceAccepted ?? null,
-        oldDeviceNote: ci?.oldDeviceNote ?? null,
+        oldDeviceCheck: ci?.oldDeviceCheck ?? null,
         fromCluster: cluster,
         doneInFlow: ci?.doneInFlow ?? null,
       });
@@ -346,7 +346,7 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
       productName: cellToString(r.fields[checkin.product]),
       paymentNote: cellToString(r.fields[checkin.note]),
       deviceAccepted: cellToBool(r.fields[checkin.deviceAccepted]),
-      oldDeviceNote: cellToString(r.fields[checkin.oldDeviceNote]),
+      oldDeviceCheck: cellToString(r.fields[checkin.oldDeviceCheck]),
     });
   }
 
@@ -360,7 +360,7 @@ export function mapDeskStates(tables: LarkTables, fields: FieldConfig = toFieldC
       productName: ci.product,
       paymentNote: ci.note,
       deviceAccepted: ci.deviceAccepted,
-      oldDeviceNote: ci.oldDeviceNote,
+      oldDeviceCheck: ci.oldDeviceCheck,
       doneInFlow: ci.doneInFlow,
     });
   }

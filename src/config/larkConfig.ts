@@ -37,8 +37,14 @@ export interface CheckinFieldMap {
   product: string;
   note: string;
   deviceAccepted: string;
-  /** Nội dung cột "Check thu cũ" — chi tiết máy cũ thu vào (khác với `deviceAccepted`, vốn chỉ là cờ đã/chưa nghiệm thu). */
-  oldDeviceNote: string;
+  /**
+   * Cột "Thu cũ check" — single-select, tuỳ event có thể có ≥ 2 lựa chọn (vd
+   * "❌ KHÔNG THU CŨ ❌" / "✅ CÓ THU CŨ ✅" / "♻️ THU CŨ SAU ♻️" — danh sách
+   * lựa chọn có thể đổi trong Lark) nên hiển thị NGUYÊN VĂN lựa chọn đang chọn,
+   * không rút gọn thành cờ đúng/sai. Khác với `deviceAccepted` ("Check nghiệm
+   * thu" — đã/chưa NGHIỆM THU máy cũ đó, việc khác).
+   */
+  oldDeviceCheck: string;
   /** Khâu vừa hoàn tất (formula) — dùng cho dòng "Trạng thái" ở "Chờ điều phối". */
   doneInFlow: string;
   /** Đã xong toàn bộ quy trình chưa (formula) — giá trị "End flow" | "In flow". */
@@ -90,7 +96,7 @@ export const DEFAULT_CHECKIN_FIELDS: CheckinFieldMap = {
   product: 'SP 1',
   note: 'Note UDTT',
   deviceAccepted: 'Check nghiệm thu',
-  oldDeviceNote: 'Check thu cũ',
+  oldDeviceCheck: 'Thu cũ check',
   doneInFlow: 'Done in Flow',
   endFlow: 'End flow',
   time: 'Thời gian',

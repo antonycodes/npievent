@@ -19,6 +19,19 @@ function translateX(x: number): string {
   return '-50%';
 }
 
+/**
+ * "Thu cũ check" là single-select — số lựa chọn tuỳ event (vd "Không thu cũ" /
+ * "Có thu cũ" / "Thu cũ sau", có thể đổi trong Lark) nên tô màu theo TỪ KHOÁ
+ * trong nhãn thay vì so khớp cứng 1 chuỗi cố định.
+ */
+function oldDeviceCheckTone(value: string | null | undefined): 'red' | 'amber' | undefined {
+  const s = value?.toLowerCase() ?? '';
+  if (!s || s.includes('không')) return undefined;
+  if (s.includes('sau')) return 'amber';
+  if (s.includes('có')) return 'red';
+  return undefined;
+}
+
 export default function CustomerPopover({ desk, customer, onClose }: CustomerPopoverProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -72,7 +85,11 @@ export default function CustomerPopover({ desk, customer, onClose }: CustomerPop
             value={customer.deviceAccepted ? 'Đã nghiệm thu' : 'Chưa nghiệm thu'}
             tone={customer.deviceAccepted ? 'red' : undefined}
           />
-          <Row label="Check thu cũ" value={customer.oldDeviceNote ?? null} />
+          <Row
+            label="Thu cũ check"
+            value={customer.oldDeviceCheck ?? null}
+            tone={oldDeviceCheckTone(customer.oldDeviceCheck)}
+          />
         </dl>
       </div>
     </div>
@@ -86,14 +103,14 @@ function Row({
 }: {
   label: string;
   value: string | null | undefined;
-  tone?: 'red';
+  tone?: 'red' | 'amber';
 }) {
+  const cls =
+    tone === 'red' ? 'font-bold text-red-600' : tone === 'amber' ? 'font-semibold text-amber-600' : 'font-medium text-neutral-800';
   return (
     <div className="flex justify-between gap-3">
       <dt className="shrink-0 text-neutral-500">{label}</dt>
-      <dd className={`text-right ${tone === 'red' ? 'font-bold text-red-600' : 'font-medium text-neutral-800'}`}>
-        {value && value.trim() ? value : '—'}
-      </dd>
+      <dd className={`text-right ${cls}`}>{value && value.trim() ? value : '—'}</dd>
     </div>
   );
 }
