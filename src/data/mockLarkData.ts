@@ -87,10 +87,10 @@ const HOAN_TAT = 'Hoàn tất';
 // "Thời gian" là mốc check-in (ms) — dùng để sắp khách trước/sau khi 1 NV
 // phục vụ nhiều người cùng lúc. Khách checkin trước phải hiện trước.
 const checkin: LarkRecord[] = [
-  { record_id: 'ci_1', fields: { STT: 1, 'Họ và tên': 'Nguyễn Minh Long', 'SP 1': 'iPhone 17 Pro 512GB | Bạc', 'Note UDTT': '', 'Check nghiệm thu': DA_NGHIEM_THU, 'End flow': IN_FLOW, 'Thời gian': 1000,
+  { record_id: 'ci_1', fields: { STT: 1, 'Họ và tên': 'Nguyễn Minh Long', 'SP 1': 'iPhone 17 Pro 512GB | Bạc', 'Note UDTT': '', 'Check nghiệm thu': DA_NGHIEM_THU, 'Check thu cũ': 'iPhone 13 128GB | Xanh — máy đẹp 95%, pin 89%', 'End flow': IN_FLOW, 'Thời gian': 1000,
     // Demo "1 NV phục vụ 2 khách" ở Thu cũ — anchor cho TC1 (NV "Thịnh_OPs"), bạn đồng hành là ci_9.
     'TC_Nsư thu cũ': 'Thịnh_OPs', 'Status in thu cũ': TIEP_NHAN } },
-  { record_id: 'ci_2', fields: { STT: 2, 'Họ và tên': 'Huỳnh Ngọc Linh', 'SP 1': 'iPhone 17 Pro Max 256GB | Cam', 'Note UDTT': '', 'Check nghiệm thu': DA_NGHIEM_THU, 'Done in Flow': 'Backup', 'End flow': END_FLOW, 'Thời gian': 2000,
+  { record_id: 'ci_2', fields: { STT: 2, 'Họ và tên': 'Huỳnh Ngọc Linh', 'SP 1': 'iPhone 17 Pro Max 256GB | Cam', 'Note UDTT': '', 'Check nghiệm thu': DA_NGHIEM_THU, 'Check thu cũ': 'iPhone 12 Pro 256GB | Đen — trầy nhẹ viền, pin 82%', 'Done in Flow': 'Backup', 'End flow': END_FLOW, 'Thời gian': 2000,
     // Demo "1 NV phục vụ 2 khách" ở Backup — anchor cho BK1 (NV "Thịnh_OPs"), bạn đồng hành là ci_11.
     'BC_Nhân sự': 'Thịnh_OPs', 'Status in backup': TIEP_NHAN } },
   { record_id: 'ci_3', fields: { STT: 3, 'Họ và tên': 'Phạm Đức Dũng', 'SP 1': 'iPhone 17 Pro 512GB | Xanh Đậm', 'Note UDTT': 'VIB 1254', 'Check nghiệm thu': CHUA_NGHIEM_THU, 'End flow': IN_FLOW, 'Thời gian': 3000,

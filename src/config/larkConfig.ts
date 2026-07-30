@@ -37,6 +37,8 @@ export interface CheckinFieldMap {
   product: string;
   note: string;
   deviceAccepted: string;
+  /** Nội dung cột "Check thu cũ" — chi tiết máy cũ thu vào (khác với `deviceAccepted`, vốn chỉ là cờ đã/chưa nghiệm thu). */
+  oldDeviceNote: string;
   /** Khâu vừa hoàn tất (formula) — dùng cho dòng "Trạng thái" ở "Chờ điều phối". */
   doneInFlow: string;
   /** Đã xong toàn bộ quy trình chưa (formula) — giá trị "End flow" | "In flow". */
@@ -88,6 +90,7 @@ export const DEFAULT_CHECKIN_FIELDS: CheckinFieldMap = {
   product: 'SP 1',
   note: 'Note UDTT',
   deviceAccepted: 'Check nghiệm thu',
+  oldDeviceNote: 'Check thu cũ',
   doneInFlow: 'Done in Flow',
   endFlow: 'End flow',
   time: 'Thời gian',

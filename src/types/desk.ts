@@ -33,6 +33,7 @@ export interface DeskCustomer {
   productName?: string | null; // SP 1 (join Check in theo tên)
   paymentNote?: string | null; // Note UDTT (join Check in theo tên)
   deviceAccepted?: boolean | null; // Đã nghiệm thu thiết bị (join Check in theo tên)
+  oldDeviceNote?: string | null; // Cột "Check thu cũ" — chi tiết máy cũ thu vào (join Check in theo tên)
 }
 
 /** Số khách tối đa 1 nhân viên tiếp nhận đồng thời (theo cụm). */

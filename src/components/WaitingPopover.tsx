@@ -84,6 +84,7 @@ export default function WaitingPopover({ zoneLabel, zone, customer, x, y, onClos
             value={customer.deviceAccepted ? 'Đã nghiệm thu' : 'Chưa nghiệm thu'}
             tone={customer.deviceAccepted ? 'red' : undefined}
           />
+          <Row label="Check thu cũ" value={customer.oldDeviceNote ?? null} />
         </dl>
       </div>
     </div>
