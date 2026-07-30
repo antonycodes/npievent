@@ -37,7 +37,7 @@ export default function EndFlowTable({ customers, onClose }: EndFlowTableProps) 
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-lg leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
           >
             ×
           </button>

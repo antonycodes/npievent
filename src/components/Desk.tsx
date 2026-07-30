@@ -58,8 +58,10 @@ export default function Desk({
       style={{ left: `${x}%`, top: `${y}%` }}
       className={[
         'absolute -translate-x-1/2 -translate-y-1/2',
-        'flex h-9 min-w-9 items-center justify-center px-1',
-        'text-[11px] font-semibold leading-none',
+        // Sized from the board scale (index.css) so the gap to the STT dots of
+        // the row above stays proportional on every screen, iPad included.
+        'flex h-[var(--node)] min-w-[var(--node)] items-center justify-center px-[0.2em]',
+        'text-[length:var(--node-fs)] font-semibold leading-none',
         'border shadow-sm transition',
         interactive ? 'cursor-pointer hover:scale-110 hover:shadow-md' : 'cursor-default',
         dimmed ? 'pointer-events-none opacity-15' : '',
@@ -71,7 +73,9 @@ export default function Desk({
       {id}
       {waiting > 0 && (
         <span
-          className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-white shadow"
+          // Sits just outside the top-right edge — never on top of the label.
+          style={{ right: 'calc(var(--dot) * -0.55)', top: 'calc(var(--dot) * -0.45)' }}
+          className="absolute flex h-[var(--dot)] min-w-[var(--dot)] items-center justify-center rounded-full bg-amber-500 px-[2px] text-[length:var(--dot-fs)] font-bold leading-none text-white shadow ring-1 ring-white"
           title={`${waiting} khách đang chờ`}
         >
           {waiting}

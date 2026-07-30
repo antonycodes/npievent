@@ -84,19 +84,19 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-full bg-neutral-100 text-neutral-800">
-      <header className="border-b border-neutral-200 bg-white px-6 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <header className="border-b border-neutral-200 bg-white px-4 py-3 md:px-6 md:py-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <div>
-            <h1 className="text-xl font-bold">NPI Event · Coordinator Dashboard</h1>
-            <p className="text-sm text-neutral-500">
+            <h1 className="text-lg font-bold md:text-xl">NPI Event · Coordinator Dashboard</h1>
+            <p className="hidden text-sm text-neutral-500 md:block">
               Sơ đồ tương tác điều phối luồng khách — đồng bộ trạng thái bàn từ Lark Base.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             <a
               href="#/settings"
-              className="rounded border border-brand px-2 py-1 font-semibold text-brand hover:bg-brand hover:text-white"
+              className="flex min-h-8 items-center rounded border border-brand px-3 font-semibold text-brand hover:bg-brand hover:text-white"
             >
               Cài đặt Lark
             </a>
@@ -124,7 +124,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={refresh}
-              className="rounded border border-neutral-300 px-2 py-1 font-medium text-neutral-600 hover:bg-neutral-50"
+              className="min-h-8 rounded border border-neutral-300 px-3 font-medium text-neutral-600 hover:bg-neutral-50"
             >
               Làm mới
             </button>
@@ -137,8 +137,8 @@ export default function DashboardPage() {
         )}
       </header>
 
-      <main className="px-6 py-6">
-        <div className="mb-4 flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
+      <main className="px-3 py-3 md:px-6 md:py-5">
+        <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
           <StatusLegend />
           <FilterBar
             filters={filters}
@@ -149,8 +149,14 @@ export default function DashboardPage() {
           />
         </div>
 
-        <div className="flex flex-col gap-6 lg:flex-row">
-          <div className="min-w-0 flex-1">
+        <div className="flex flex-col gap-4 lg:flex-row lg:gap-5">
+          {/*
+            Board width is capped by the space left below the header + filter row
+            (≈11.5rem) times the board aspect ratio, so on a tablet in landscape
+            the whole floor map fits the screen without scrolling instead of
+            being squeezed vertically — the desks stay as large as possible.
+          */}
+          <div className="mx-auto w-full min-w-0 flex-1 max-w-[calc((100dvh-11.5rem)*16/9)] [@media(max-aspect-ratio:8/5)]:max-w-[calc((100dvh-11.5rem)*1.44)]">
             <LayoutDashboard
               desks={desks}
               selectedId={selectedId}
